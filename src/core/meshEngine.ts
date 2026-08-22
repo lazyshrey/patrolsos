@@ -27,6 +27,7 @@ import { Category } from '../types';
 import { DEFAULT_TTL, MAX_HOPS, decodePacket, encodePacket, shortId } from '../proto/codec';
 import { computePacketId, type Sha256Fn } from '../proto/packetId';
 import { incidentFromPacket, mergeIncident, nextLamport } from './crdt';
+import { Outbox } from './outbox';
 
 const SEEN_CAP = 2000;
 const ROTATION_CAP = 24;
@@ -83,6 +84,9 @@ export class MeshEngine {
   private rotation: Packet[] = [];
   private gcTimer: ReturnType<typeof setInterval> | null = null;
 
+  /** Queue of packets we authored, with echo-based delivery receipts. */
+  readonly outbox: Outbox;
+
   /** Counters for the Network screen. */
   stats = { heard: 0, relayed: 0, originated: 0, dropped: 0 };
 
@@ -92,6 +96,7 @@ export class MeshEngine {
     this.sha256 = opts.sha256;
     this.now = opts.now ?? (() => Date.now());
     this.onChange = opts.onChange;
+    this.outbox = new Outbox(this.now);
   }
 
   // -------------------------------------------------------------------------
@@ -151,6 +156,7 @@ export class MeshEngine {
     this.ingest(packet, at, true);
     this.markSeen(this.seenKey(packet));
     this.enqueue(packet);
+    this.outbox.add(packet);
     this.stats.originated++;
     this.pushLog('tx', packetId, `new ${shortId(packetId)} ttl ${packet.ttl}`);
     this.rebuildRotation();
@@ -216,6 +222,7 @@ export class MeshEngine {
     this.ingest(packet, at, false);
     this.markSeen(this.seenKey(packet));
     this.enqueue(packet);
+    this.outbox.add(packet);
     this.pushLog('tx', packetId, `status -> ${status}`);
     this.rebuildRotation();
     this.emit();
@@ -238,6 +245,19 @@ export class MeshEngine {
   receive(packet: Packet, rssi = 0): void {
     const at = this.now();
     const key = this.seenKey(packet);
+
+    // DELIVERY RECEIPT. A packet carrying our own originNodeId with hops > 0 is
+    // proof some other device picked it up and chose to carry it onward.
+    //
+    // This MUST run before the seen-set check: we marked our own packet seen the
+    // moment we authored it, so the echo would otherwise be suppressed here and
+    // the receipt lost.
+    if (packet.originNodeId === this.nodeId && packet.hops > 0) {
+      if (this.outbox.noteEcho(packet.packetId)) {
+        this.pushLog('rx', packet.packetId, `delivered — relayed by a peer`);
+        this.emit();
+      }
+    }
 
     if (this.seen.has(key)) {
       this.stats.dropped++;
@@ -291,6 +311,12 @@ export class MeshEngine {
   // Broadcast rotation
   // -------------------------------------------------------------------------
 
+  /** Ours, and no peer has echoed it back yet. */
+  private isUnsent(p: Packet): boolean {
+    if (p.originNodeId !== this.nodeId) return false;
+    return this.outbox.get(p.packetId)?.state === 'pending';
+  }
+
   /** Add or replace a packet in the rotation, newest version wins. */
   private enqueue(packet: Packet): void {
     const stale = (p: Packet) =>
@@ -313,6 +339,11 @@ export class MeshEngine {
     for (const p of this.rotation) byId.set(p.packetId, p);
 
     const ranked = [...byId.values()].sort((a, b) => {
+      // Our own packets that nobody has echoed yet come first. They are the
+      // only ones we KNOW have not got out, so they need the radio most.
+      const unsent = Number(this.isUnsent(b)) - Number(this.isUnsent(a));
+      if (unsent !== 0) return unsent;
+
       const sev = triageRank(a.triage) - triageRank(b.triage);
       if (sev !== 0) return sev;
       const unresolved = Number(a.status === 3) - Number(b.status === 3);
@@ -321,6 +352,9 @@ export class MeshEngine {
     });
 
     this.rotation = ranked.slice(0, ROTATION_CAP);
+    for (const p of this.rotation) {
+      if (p.originNodeId === this.nodeId) this.outbox.markBroadcast(p.packetId);
+    }
     this.transport.setBroadcastSet(this.rotation.map(encodePacket));
   }
 
@@ -371,6 +405,8 @@ export class MeshEngine {
     for (const [id, peer] of this.peers) {
       if (at - peer.lastSeen > PEER_STALE_MS) this.peers.delete(id);
     }
+
+    this.outbox.sweep();
 
     for (const [id, inc] of this.incidents) {
       if (inc.status === 3 && at - inc.lastSeen > RESOLVED_TTL_MS) {

@@ -29,6 +29,7 @@ import { callsign, generateNodeId } from './src/services/nodeIdentity';
 import { shortId } from './src/proto/codec';
 import { CATEGORY_LABEL, STATUS_LABEL, TRIAGE_LABEL, describe } from './src/proto/presets';
 import { formatDistance, haversineMeters } from './src/core/geo';
+import type { OutboxEntry } from './src/core/outbox';
 import { Category, Status, Triage, type Incident, type PacketEvent, type PeerState } from './src/types';
 import type { BleStatus } from './modules/patrol-ble/src/PatrolBleModule';
 
@@ -67,6 +68,7 @@ export default function App() {
   const [status, setStatus] = useState<BleStatus | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [peers, setPeers] = useState<PeerState[]>([]);
+  const [outbox, setOutbox] = useState<OutboxEntry[]>([]);
   const [log, setLog] = useState<PacketEvent[]>([]);
   const [stats, setStats] = useState({ heard: 0, relayed: 0, originated: 0, dropped: 0 });
   const [coords, setCoords] = useState<{ lat: number; lon: number; acc: number } | null>(null);
@@ -96,6 +98,7 @@ export default function App() {
       if (!e) return;
       setIncidents(e.getIncidents());
       setPeers(e.getPeers());
+      setOutbox(e.outbox.all());
       setLog(e.getLog().slice(0, 40));
       setStats({ ...e.stats });
     }, 700);
@@ -295,6 +298,38 @@ export default function App() {
           <Stat label="relayed" value={stats.relayed} />
           <Stat label="sent" value={stats.originated} />
           <Stat label="dropped" value={stats.dropped} />
+        </View>
+
+        {/* Outbox — did my report actually get out? */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Your reports ({outbox.length})</Text>
+          {outbox.length === 0 && <Text style={s.hint}>You have not sent anything yet.</Text>}
+          {outbox.map((e) => {
+            const done = e.state === 'delivered';
+            const dead = e.state === 'expired';
+            const color = done ? C.green : dead ? C.faint : C.amber;
+            return (
+              <View key={e.packetId} style={s.row}>
+                <View style={[s.dot, { backgroundColor: color }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowText}>
+                    {describe(e.packet.descPreset)} · {TRIAGE_LABEL[e.packet.triage]}
+                  </Text>
+                  <Text style={[s.incStatus, { color }]}>
+                    {done
+                      ? `Picked up by the mesh · ${e.echoes} relay${e.echoes === 1 ? '' : 's'} heard`
+                      : dead
+                        ? 'Gave up — nobody ever picked it up'
+                        : 'Waiting for someone to pick it up…'}
+                  </Text>
+                  <Text style={s.incMeta}>{shortId(e.packetId)}</Text>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={s.hint}>
+            Confirmation means another phone relayed it onward — not that help is coming.
+          </Text>
         </View>
 
         {/* Peers — the dataset a map layer would render */}

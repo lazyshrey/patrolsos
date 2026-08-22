@@ -1,116 +1,151 @@
-# Field test — does the mesh actually work?
+# Field testing
 
-This build exists to answer one question on real hardware:
-
-> Does a 20-byte packet relay from phone A to phone C **through** phone B,
-> and does a status change travel back the other way?
-
-Everything else — the designed UI, the map, dedup, resource matching — waits
-until this is answered.
+The app has four tabs: **Request**, **Incidents**, **Network**, **Checks**.
+Everything below refers to those.
 
 ---
 
-## 1. Install
+## 0. Install
 
 ```bash
-adb devices
+adb install -r patrol-latest.apk
 ```
 
-The APK is at `patrol-v0.2-test.apk` in the project root. It is
-signed with the standard debug keystore, so it installs on any phone with
-"install from unknown sources" allowed. It is a **release** build — the JS is
-bundled in, so the phones do **not** need to stay near your laptop or have
-Metro running.
+Signed with the standard debug keystore, so it installs on any phone with
+"install from unknown sources" allowed. It is a **release** build — the
+JavaScript is bundled in, so phones run standalone with no dev server and no
+tether to your laptop. That matters when you walk them apart.
 
-Install to each phone:
-
-```bash
-adb -s <SERIAL> install -r patrol-v0.2-test.apk
-```
-
-Or copy the APK over and tap it on each device.
-
-**Label the phones physically. A, B, C.** You will mix them up otherwise.
+**Label the phones physically: A, B, C.** You will mix them up otherwise.
 
 ---
 
-## 2. Preflight — all four lights green
+## 1. Preflight — four green lights
 
-Open the app. The "Radio check" panel must show four greens on every phone:
+Open **Checks**. All four must be green on every phone before anything else.
 
 | Check | If red |
 | --- | --- |
 | Bluetooth on | Turn Bluetooth on |
-| Can advertise | **Hard stop.** This chipset cannot do BLE peripheral advertising. Swap the phone. |
-| Permissions | Tap Start mesh and accept "Nearby devices" + "Location" |
-| Location services | Pull down the shade and turn Location ON — Android hides BLE scan results without it, even when permissions are granted |
+| Can advertise | **Hard stop.** This chipset cannot broadcast over BLE. Nothing in software fixes it — use a different phone. |
+| Permissions | Tap **Start mesh** and accept the prompts |
+| Location services | Pull down the shade and turn Location **on** |
 
-The third and fourth fail **silently** at the Android level. That is why they
-are surfaced here rather than left to be debugged later.
+The last two fail **silently** at the Android level. Location services is the
+single most common cause of "nothing is working": Android hides Bluetooth scan
+results when Location is off, even with permission granted.
 
-Note the node number shown under the title — each phone generates its own on
-launch, and all three must differ.
-
----
-
-## 3. Test 1 — two phones talk at all
-
-1. Start mesh on **A** and **B**, sitting next to each other.
-2. On A, tap **Send NOW**.
-3. Within a few seconds B should show the incident, with `hops 1` and
-   `from <A's node number>`.
-4. B's "heard" counter should climb.
-
-If nothing arrives, see Troubleshooting below. Do not move on until this works.
+Note the node number under the title. Each phone keeps its own across restarts
+now, and all three must differ.
 
 ---
 
-## 4. Test 2 — the real one: multi-hop relay
+## 2. One phone — does it run at all
 
-This is the whole thesis.
+1. **Checks → Start mesh.** Accept the permission prompts.
+2. **Request** should show "Location found, accurate to N m" within a few
+   seconds outdoors. Indoors it may say no location — that is fine, reports
+   still send.
+3. Send a report: pick a category, an urgency, tap **Send**.
+4. **Incidents** should list it immediately.
+5. **Network → Your reports** should show *"Waiting to be picked up"* — correct
+   with nobody else around.
 
-1. Start mesh on all three.
-2. Put **B in the middle**. Walk **A** and **C** apart until they can no longer
-   hear each other directly — typically 30–50 m with a wall or two, or opposite
-   ends of a building.
-3. Confirm they are genuinely out of range: stop the mesh on B, send from A,
-   and check that **C receives nothing**. Restart B.
+Then force-close the app and reopen it. Your node number should be **the same**,
+and your report should still be in Incidents. That is persistence working.
+
+---
+
+## 3. Two phones — the first real test
+
+This is the one thing that cannot be proven in a simulator.
+
+1. Start the mesh on **A** and **B**, side by side.
+2. Send a report from **A**.
+3. Within a few seconds **B** should show it under Incidents.
+4. **B → Network** should list A as a nearby phone, marked **Direct**.
+5. **A → Network → Your reports** should flip to **"Picked up by the mesh"**.
+
+That last step is the delivery receipt: A heard B re-broadcasting A's own
+packet. It proves the relay is real, not that B merely displayed something.
+
+If nothing arrives, see Troubleshooting. Do not move on until this works.
+
+---
+
+## 4. Three phones — multi-hop relay
+
+The whole thesis.
+
+1. Start the mesh on all three. Put **B in the middle**.
+2. Walk **A** and **C** apart until they cannot hear each other — typically
+   30–50 m with a wall or two.
+3. **Prove they are out of range:** stop the mesh on B, send from A, confirm
+   **C receives nothing**. Restart B.
 4. Send from **A**.
-5. **C should receive the incident with `hops 2`.**
+5. **C should receive it.** Open the incident on C — it should show **2 hops**.
 
-`hops 2` is the proof. It means the packet was relayed twice: once by B's radio
-after B heard it from A. C never heard A directly.
-
----
-
-## 5. Test 3 — status travels backward
-
-1. With the Test 2 layout still standing, on **C** tap the incident.
-2. It advances `Reported → Seen by base → On the way`.
-3. **A should show the new status within ~10 seconds**, without A and C ever
-   being in direct range.
-
-This is the differentiator. A victim gets confirmation that help is coming,
-over a network with no infrastructure at all.
+`2 hops` is the proof. C never heard A directly; B carried it.
 
 ---
 
-## 6. Test 4 — partition and heal
+## 5. Status travels backward
+
+1. Keep the Test 4 layout.
+2. On **C**, tap the incident, then **Acknowledge**, then **Send a team**.
+3. **A should show "On the way" within ~15 seconds** — with A and C never in
+   direct range of each other.
+
+This is the differentiator. A person gets confirmation that help is coming, over
+a network with no infrastructure at all.
+
+---
+
+## 6. Partition and heal
 
 1. Force-stop the app on **B**.
 2. Send a new report from **A**. C should not receive it.
 3. Restart the mesh on **B**.
-4. C should pick the report up as B re-broadcasts what it is carrying.
+4. C should pick it up as B re-broadcasts what it is carrying.
 
-This shows store-and-forward: B is not just a wire, it holds packets and keeps
-offering them.
+B is not a wire — it holds packets and keeps offering them.
 
 ---
 
-## 7. Test 5 — no infrastructure at all
+## 7. Peer positions
 
-Put all three phones in **airplane mode**, then turn Bluetooth back on. Repeat
-Test 2. Everything should behave identically. No cell, no Wi-Fi, no internet.
+1. All three running, outdoors so GPS locks.
+2. Wait ~20 seconds.
+3. **Network → Nearby** should list the other phones with a distance, and say
+   **Direct** or **Through another phone**.
+4. Walk one away — the distance should update within ~15 s.
+5. Turn one off — it should disappear within ~30 s.
+
+`position unknown` means that phone has no GPS fix yet. It is still relaying
+fine; it just has nothing to share. Common indoors.
+
+---
+
+## 8. Locating a phone with no GPS
+
+Needs three phones with a fix plus one without.
+
+1. On the fourth phone, turn **Location off** but leave Bluetooth on, and start
+   the mesh.
+2. Keep the other three spread out — **not in a straight line**, or the geometry
+   cannot pin a point.
+3. Wait ~60 s for observations to circulate.
+4. **Network → Estimated positions** should show it with a radius.
+
+Expect tens of metres, not metres. The claim is narrowing a search from a
+district to a building, nothing more.
+
+---
+
+## 9. No infrastructure at all
+
+Put every phone in **airplane mode**, then turn Bluetooth back on. Repeat
+Test 4. Behaviour should be identical. No cell, no Wi-Fi, no internet.
 
 ---
 
@@ -118,57 +153,32 @@ Test 2. Everything should behave identically. No cell, no Wi-Fi, no internet.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Nothing received, "heard" stays 0 | Location services off | Turn Location on — the single most common cause |
-| Each peer heard once then silence | Scan duplicate filtering | Already handled: `CALLBACK_TYPE_ALL_MATCHES` + `reportDelay 0` |
-| "Can advertise" red | Chipset lacks peripheral mode | Use a different phone; nothing in software fixes this |
-| Advertising throws | `BLUETOOTH_ADVERTISE` not granted at runtime | Restart the mesh and accept the prompt |
-| Works at 1 m, dead at 5 m | TX power | Already at `ADVERTISE_TX_POWER_HIGH` / `ADVERTISE_MODE_LOW_LATENCY` |
-| Stops after reload | Leaked advertiser from the previous session | Toggle Bluetooth off/on |
-| dropped counter climbing fast | Normal | Every duplicate you hear counts as a drop; that is suppression working |
+| Nothing received, `heard` stays 0 | Location services off | Turn Location on |
+| "Can advertise" red | Chipset lacks peripheral mode | Different phone; no software fix |
+| Nothing after a reload | Leaked advertiser from the last session | Toggle Bluetooth off and on |
+| Works at 1 m, dead at 5 m | TX power | Already at maximum; check for obstructions |
+| `dropped` climbing fast | Normal | Every duplicate counts as a drop; that is suppression working |
+| Estimated position wildly off | Observers in a straight line | Spread them into a triangle |
+
+**Counters** (Checks tab): `heard` = packets decoded off the radio including
+duplicates · `relayed` = packets carried for someone else · `sent` = reports you
+originated · `dropped` = duplicates suppressed plus undecodable advertisements.
+
+On a healthy mesh `dropped` climbs much faster than `heard`. Each phone
+re-advertises roughly once a second, so you hear the same packet many times and
+ignore all but the first.
+
+**Battery.** Listening runs 5 seconds in every 9. Advertising is continuous, so
+you stay discoverable at all times. Expect meaningfully longer life than
+flat-out scanning, but this is still a radio running constantly — keep phones
+charged for long tests.
 
 ---
 
-## What the counters mean
+## Known limits
 
-- **heard** — packets decoded off the radio, including duplicates you suppress
-- **relayed** — packets you re-broadcast on someone else's behalf
-- **sent** — reports you originated
-- **dropped** — duplicates suppressed, plus undecodable advertisements
-
-On a healthy 3-phone mesh, `dropped` climbing much faster than `heard` is
-expected and correct — each phone re-advertises every ~900 ms, so you hear the
-same packet many times and ignore all but the first.
-
----
-
-## Known limits of this build
-
-- Node id is regenerated on every launch (persisting it needs a storage
-  dependency and another rebuild). Written down on screen so you can track it.
-- No map or resource matching in the UI yet. Deduplication and peer positions are implemented and tested; the map that renders them is the next step.
-- The UI is a test harness, not the designed app.
-- Packets are unsigned. Anyone could inject a false report. Documented
-  trade-off: a 64-byte signature does not fit in a 20-byte advertisement.
-
----
-
-## Test 6 — peer positions (v0.2)
-
-Each phone now broadcasts a PRESENCE packet every 15 seconds carrying its own
-GPS position. This is the dataset the map layer will render.
-
-1. Start the mesh on all three phones, outdoors or near a window so GPS locks.
-2. Wait ~20 seconds.
-3. The **Peers** panel on each phone should list the other two:
-   - a **green dot** and `direct` for a phone in radio range
-   - an **amber dot** and `via relay` for one reached through another phone
-   - coordinates and a distance for any peer that has sent a presence packet
-4. Walk one phone away. Its distance should update within ~15 s.
-5. Turn one phone off. It should disappear from Peers within ~30 s.
-
-If a peer shows `position unknown`, that phone has no GPS fix yet — it is still
-relaying fine, it just has no coordinates to share. Indoors this is common.
-
-Presence uses **TTL 2**, so a peer three or more hops away deliberately will not
-appear. That is intended: flooding everyone's coordinates across the whole mesh
-would drown the incident traffic that actually matters.
+- Packets are unsigned; anyone in range could inject a false report.
+- Wi-Fi Direct is written but disabled — OEM group-formation behaviour is
+  unverified.
+- No map yet. The data exists; the rendering does not.
+- Position estimates are areas, never pins.

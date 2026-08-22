@@ -30,6 +30,7 @@ import { shortId } from './src/proto/codec';
 import { CATEGORY_LABEL, STATUS_LABEL, TRIAGE_LABEL, describe } from './src/proto/presets';
 import { formatDistance, haversineMeters } from './src/core/geo';
 import type { OutboxEntry } from './src/core/outbox';
+import { WifiSync, type WifiSyncStatus } from './src/transport/WifiSync';
 import { Category, Status, Triage, type Incident, type PacketEvent, type PeerState } from './src/types';
 import type { BleStatus } from './modules/patrol-ble/src/PatrolBleModule';
 
@@ -45,6 +46,13 @@ const C = {
   amber: '#C2820E',
   green: '#2E7D4F',
 };
+
+/**
+ * Wi-Fi Direct bulk sync is written and unit-tested, but its group-formation
+ * behaviour varies by OEM and is unverified on real hardware. Parked until BLE
+ * testing is finished — flip to true to expose the toggle.
+ */
+const ENABLE_WIFI_DIRECT = false;
 
 const TRIAGE_COLOR: Record<number, string> = {
   0: C.red,
@@ -62,6 +70,7 @@ export default function App() {
   const coordsRef = useRef<{ lat: number; lon: number } | null>(null);
   const presenceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const wifiRef = useRef<WifiSync | null>(null);
 
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -69,6 +78,8 @@ export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [peers, setPeers] = useState<PeerState[]>([]);
   const [outbox, setOutbox] = useState<OutboxEntry[]>([]);
+  const [wifi, setWifi] = useState<WifiSyncStatus | null>(null);
+  const [wifiOn, setWifiOn] = useState(false);
   const [log, setLog] = useState<PacketEvent[]>([]);
   const [stats, setStats] = useState({ heard: 0, relayed: 0, originated: 0, dropped: 0 });
   const [coords, setCoords] = useState<{ lat: number; lon: number; acc: number } | null>(null);
@@ -99,6 +110,7 @@ export default function App() {
       setIncidents(e.getIncidents());
       setPeers(e.getPeers());
       setOutbox(e.outbox.all());
+      setWifi(wifiRef.current?.getStatus() ?? null);
       setLog(e.getLog().slice(0, 40));
       setStats({ ...e.stats });
     }, 700);
@@ -179,6 +191,10 @@ export default function App() {
     presenceTimer.current = null;
     watchRef.current?.remove();
     watchRef.current = null;
+    await wifiRef.current?.stop().catch(() => {});
+    wifiRef.current = null;
+    setWifiOn(false);
+    setWifi(null);
     try {
       await engineRef.current?.stop();
     } catch {
@@ -208,6 +224,25 @@ export default function App() {
     },
     [coords]
   );
+
+  const toggleWifi = useCallback(async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    if (wifiRef.current) {
+      await wifiRef.current.stop().catch(() => {});
+      wifiRef.current = null;
+      setWifiOn(false);
+      setWifi(null);
+      return;
+    }
+
+    const sync = new WifiSync(engine);
+    wifiRef.current = sync;
+    setWifiOn(true);
+    await sync.start().catch((e) => setError(String(e)));
+    setWifi(sync.getStatus());
+  }, []);
 
   const advance = useCallback((inc: Incident) => {
     const e = engineRef.current;
@@ -299,6 +334,57 @@ export default function App() {
           <Stat label="sent" value={stats.originated} />
           <Stat label="dropped" value={stats.dropped} />
         </View>
+
+        {/* Wi-Fi Direct bulk sync — optional upgrade on top of BLE */}
+        {ENABLE_WIFI_DIRECT && running && (
+          <View style={s.card}>
+            <View style={s.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.cardTitle}>Wi-Fi Direct bulk sync</Text>
+                <Text style={s.hint}>
+                  Swaps whole stores at once. BLE keeps running underneath either way.
+                </Text>
+              </View>
+              <Pressable
+                style={[
+                  s.toggle,
+                  { backgroundColor: wifiOn ? C.action : '#FFFFFF', borderColor: C.line },
+                ]}
+                onPress={toggleWifi}
+              >
+                <Text style={{ color: wifiOn ? '#fff' : C.ink, fontWeight: '600', fontSize: 13 }}>
+                  {wifiOn ? 'On' : 'Off'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {wifi && (
+              <>
+                <View style={s.row}>
+                  <View
+                    style={[
+                      s.dot,
+                      {
+                        backgroundColor:
+                          wifi.state === 'unsupported' || wifi.state === 'error'
+                            ? C.red
+                            : wifi.state === 'connected' || wifi.state === 'hosting'
+                              ? C.green
+                              : C.amber,
+                      },
+                    ]}
+                  />
+                  <Text style={s.rowText}>
+                    {wifi.state}
+                    {wifi.isOwner ? ` · owner · ${wifi.clientCount} client(s)` : ''}
+                  </Text>
+                </View>
+                <Text style={s.incMeta}>{wifi.networkName}</Text>
+                {wifi.message && <Text style={s.hint}>{wifi.message}</Text>}
+              </>
+            )}
+          </View>
+        )}
 
         {/* Outbox — did my report actually get out? */}
         <View style={s.card}>
@@ -480,5 +566,13 @@ const s = StyleSheet.create({
   incMeta: { fontSize: 12, color: C.faint, fontFamily: mono },
   incStatus: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   logLine: { fontSize: 11, color: C.soft, fontFamily: mono },
+  toggle: {
+    paddingHorizontal: 18,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   footer: { fontSize: 13, color: C.faint, lineHeight: 19 },
 });

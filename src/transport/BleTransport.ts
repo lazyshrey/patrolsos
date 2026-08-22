@@ -34,8 +34,9 @@ export class BleTransport implements Transport {
   static async requestPermissions(): Promise<boolean> {
     if (Platform.OS !== 'android') return false;
 
+    const api = Number(Platform.Version);
     const wanted: string[] =
-      Number(Platform.Version) >= 31
+      api >= 31
         ? [
             'android.permission.BLUETOOTH_SCAN',
             'android.permission.BLUETOOTH_ADVERTISE',
@@ -43,6 +44,10 @@ export class BleTransport implements Transport {
             'android.permission.ACCESS_FINE_LOCATION',
           ]
         : ['android.permission.ACCESS_FINE_LOCATION'];
+
+    // NOTE: Wi-Fi Direct would also need NEARBY_WIFI_DEVICES from Android 13.
+    // Deliberately NOT requested — the Wi-Fi path is parked (see WifiSync.ts),
+    // and asking for a permission we do not use is both rude and confusing.
 
     const result = await PermissionsAndroid.requestMultiple(wanted as never[]);
     return Object.values(result).every((v) => v === 'granted');

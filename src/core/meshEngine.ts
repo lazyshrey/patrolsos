@@ -438,6 +438,65 @@ export class MeshEngine {
   }
 
   // -------------------------------------------------------------------------
+  // Bulk sync (Wi-Fi Direct)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Every incident we hold, as concatenated 20-byte packets.
+   *
+   * BLE dribbles one packet per advertising slot; over a Wi-Fi Direct socket we
+   * can hand a peer the whole store at once. A few hundred incidents is a few
+   * kilobytes — nothing for Wi-Fi.
+   */
+  exportAll(): Uint8Array {
+    const incidents = [...this.incidents.values()];
+    const out = new Uint8Array(incidents.length * 20);
+    incidents.forEach((inc, i) => {
+      out.set(
+        encodePacket({
+          packetId: inc.packetId,
+          lat: inc.lat,
+          lon: inc.lon,
+          category: inc.category,
+          triage: inc.triage,
+          casualties: inc.casualties,
+          // Bulk-synced packets get a fresh hop budget: the receiver is a new
+          // region of the mesh, not another hop along the same chain.
+          ttl: DEFAULT_TTL,
+          hops: Math.min(inc.hops + 1, MAX_HOPS),
+          lamport: inc.lamport,
+          status: inc.status,
+          descPreset: inc.descPreset,
+          originNodeId: inc.originNodeId,
+        }),
+        i * 20
+      );
+    });
+    return out;
+  }
+
+  /**
+   * Feed a peer's whole store in. Each packet goes through the SAME receive()
+   * path as one heard over BLE, so dedup, the status lattice and Lamport LWW
+   * all apply unchanged. Returns how many packets were accepted.
+   */
+  importBulk(bytes: Uint8Array): number {
+    let accepted = 0;
+    for (let off = 0; off + 20 <= bytes.length; off += 20) {
+      const packet = decodePacket(bytes.subarray(off, off + 20));
+      if (!packet) {
+        this.stats.dropped++;
+        continue;
+      }
+      const before = this.incidents.size;
+      this.receive(packet, 0);
+      if (this.incidents.size > before) accepted++;
+    }
+    if (accepted > 0) this.pushLog('rx', 0, `wifi bulk sync: ${accepted} new`);
+    return accepted;
+  }
+
+  // -------------------------------------------------------------------------
   // Read API
   // -------------------------------------------------------------------------
 

@@ -1,0 +1,7 @@
+expo.modules.patrolble.patrol-ble-pngs-0 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\build\generated\res\pngs\release
+expo.modules.patrolble.patrol-ble-resValues-1 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\build\generated\res\resValues\release
+expo.modules.patrolble.patrol-ble-mergeReleaseResources-2 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\build\intermediates\incremental\release\mergeReleaseResources\merged.dir
+expo.modules.patrolble.patrol-ble-mergeReleaseResources-3 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\build\intermediates\incremental\release\mergeReleaseResources\stripped.dir
+expo.modules.patrolble.patrol-ble-release-4 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\build\intermediates\merged_res\release\mergeReleaseResources
+expo.modules.patrolble.patrol-ble-main-5 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\src\main\res
+expo.modules.patrolble.patrol-ble-release-6 C:\Codes\projects\P.A.T.R.O.L\modules\patrol-ble\android\src\release\res

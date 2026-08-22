@@ -4,6 +4,8 @@
   "main": "index.ts",
   "dependencies": {
     "expo": "~57.0.15",
+    "expo-battery": "~57.0.2",
+    "expo-haptics": "~57.0.1",
     "expo-location": "~57.0.12",
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",

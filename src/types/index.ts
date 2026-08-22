@@ -130,6 +130,15 @@ export interface PeerState {
   lon?: number;
   /** 0 = heard directly off the radio; higher = reached through a relay. */
   hops: number;
+  /** Battery percentage from that peer's presence packets, if it has shared one. */
+  battery?: number;
+  /** Last time we heard this peer with hops === 0, i.e. straight off the radio. */
+  lastDirectAt?: number;
+  /**
+   * Lamport clock of the newest presence packet we accepted from this peer.
+   * Guards against a slow relayed copy dragging their position backwards.
+   */
+  presenceLamport?: number;
 }
 
 export type PacketDirection = 'rx' | 'tx' | 'drop' | 'merge';

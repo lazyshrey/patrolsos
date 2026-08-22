@@ -236,6 +236,53 @@ function dedupeByObserver(obs: Observation[]): Observation[] {
   return [...best.values()];
 }
 
+/**
+ * How close a peer is, in words rather than false precision.
+ *
+ * Two GPS fixes each accurate to ±5-10 m can put two phones lying side by side
+ * "9 m" apart — the number is arithmetically correct and completely wrong. At
+ * short range RSSI is the better instrument, so we use it, and we report a band
+ * rather than a figure because that is genuinely all either instrument knows.
+ *
+ * A metre figure only appears once the GPS separation is large enough to
+ * survive the combined error of both fixes.
+ */
+export const GPS_TRUST_THRESHOLD_M = 40;
+
+export type Proximity =
+  | 'right here'
+  | 'very close'
+  | 'nearby'
+  | 'in range'
+  | 'far'
+  | 'relayed';
+
+export function describeProximity(opts: {
+  hops: number;
+  rssi: number;
+  gpsDistanceM?: number | null;
+}): { label: Proximity; detail: string } {
+  if (opts.hops > 0) {
+    return { label: 'relayed', detail: 'through another phone' };
+  }
+
+  // Far enough apart that GPS beats RSSI and the number means something.
+  if (opts.gpsDistanceM != null && opts.gpsDistanceM > GPS_TRUST_THRESHOLD_M) {
+    return {
+      label: 'far',
+      detail:
+        opts.gpsDistanceM < 1000
+          ? `${Math.round(opts.gpsDistanceM / 10) * 10} m away`
+          : `${(opts.gpsDistanceM / 1000).toFixed(1)} km away`,
+    };
+  }
+
+  if (opts.rssi >= -55) return { label: 'right here', detail: 'right here' };
+  if (opts.rssi >= -68) return { label: 'very close', detail: 'a few steps away' };
+  if (opts.rssi >= -80) return { label: 'nearby', detail: 'nearby' };
+  return { label: 'in range', detail: 'at the edge of range' };
+}
+
 /** How far off an estimate turned out to be. For tests and calibration. */
 export function estimateError(estimate: LocationEstimate, truth: LatLon): number {
   return haversineMeters({ lat: estimate.lat, lon: estimate.lon }, truth);

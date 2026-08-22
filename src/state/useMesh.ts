@@ -8,6 +8,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
+import * as Battery from 'expo-battery';
+import * as Haptics from 'expo-haptics';
 
 import { MeshEngine } from '../core/meshEngine';
 import { BleTransport } from '../transport/BleTransport';
@@ -25,6 +27,7 @@ import {
 } from '../services/storage';
 import { clusterIncidents, type Cluster } from '../core/deduplicator';
 import type { LocationEstimate } from '../core/localization';
+import { analyseBridge, bridgeMessage, type BridgeStatus } from '../core/topology';
 import type { OutboxEntry } from '../core/outbox';
 import type { BleStatus } from '../../modules/patrol-ble/src/PatrolBleModule';
 import type { Category, Incident, PacketEvent, PeerState, Status, Triage } from '../types';
@@ -52,18 +55,22 @@ export interface MeshState {
   clusters: Cluster[];
   peers: PeerState[];
   estimates: LocationEstimate[];
+  bridge: BridgeStatus;
+  bridgeWarning: string | null;
+  battery: number | null;
   outbox: OutboxEntry[];
   log: PacketEvent[];
   stats: { heard: number; relayed: number; originated: number; dropped: number };
 
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  /** Returns the packetId of the report just created, or null if not running. */
   report: (input: {
     category: Category;
     triage: Triage;
     casualties: number;
     descPreset: number;
-  }) => void;
+  }) => number | null;
   setStatus: (packetId: number, status: Status) => void;
   reset: () => Promise<void>;
   restored: boolean;
@@ -76,6 +83,7 @@ export function useMesh(): MeshState {
   const fixRef = useRef<Fix | null>(null);
   const timers = useRef<Array<ReturnType<typeof setInterval>>>([]);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const batteryRef = useRef<number | null>(null);
 
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -89,6 +97,12 @@ export function useMesh(): MeshState {
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [peers, setPeers] = useState<PeerState[]>([]);
   const [estimates, setEstimates] = useState<LocationEstimate[]>([]);
+  const [bridge, setBridge] = useState<BridgeStatus>({
+    isBridge: false,
+    groups: [],
+    isolated: [],
+  });
+  const [battery, setBattery] = useState<number | null>(null);
   const [outbox, setOutbox] = useState<OutboxEntry[]>([]);
   const [log, setLog] = useState<PacketEvent[]>([]);
   const [stats, setStats] = useState({ heard: 0, relayed: 0, originated: 0, dropped: 0 });
@@ -114,6 +128,30 @@ export function useMesh(): MeshState {
     };
   }, []);
 
+  // Our own battery, shared with peers so the network knows which relays are
+  // about to die.
+  useEffect(() => {
+    let cancelled = false;
+    const read = async () => {
+      try {
+        const level = await Battery.getBatteryLevelAsync();
+        if (!cancelled && level >= 0) {
+          const pct = Math.round(level * 100);
+          batteryRef.current = pct;
+          setBattery(pct);
+        }
+      } catch {
+        /* not available */
+      }
+    };
+    void read();
+    const t = setInterval(read, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
   // Radio preflight, polled so the user sees Location being switched on.
   useEffect(() => {
     const read = () => {
@@ -133,10 +171,12 @@ export function useMesh(): MeshState {
       const e = engineRef.current;
       if (!e) return;
       const list = e.getIncidents();
+      const peers = e.getPeers();
       setIncidents(list);
       setClusters(clusterIncidents(list));
-      setPeers(e.getPeers());
+      setPeers(peers);
       setEstimates(e.getLocationEstimates());
+      setBridge(analyseBridge(e.nodeId, peers, e.getObservations()));
       setOutbox(e.outbox.all());
       setLog(e.getLog().slice(0, 50));
       setStats({ ...e.stats });
@@ -222,7 +262,7 @@ export function useMesh(): MeshState {
       // "I am here" — puts this phone on other people's maps.
       const beacon = () => {
         const f = fixRef.current;
-        if (f) engine.announcePresence(f.lat, f.lon);
+        if (f) engine.announcePresence(f.lat, f.lon, batteryRef.current ?? 255);
       };
       beacon();
       timers.current.push(setInterval(beacon, PRESENCE_MS));
@@ -262,11 +302,19 @@ export function useMesh(): MeshState {
 
   const report = useCallback<MeshState['report']>((input) => {
     const engine = engineRef.current;
-    if (!engine) return;
+    if (!engine) return null;
     // Without a fix we still send: a report with a rough position beats silence,
     // and peers who hear it can trilaterate us.
     const f = fixRef.current ?? { lat: 0, lon: 0, acc: 0 };
-    engine.originate({ lat: f.lat, lon: f.lon, ...input });
+    const packet = engine.originate({ lat: f.lat, lon: f.lon, ...input });
+    // Something has to happen in the hand — the mesh is otherwise invisible.
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => {}
+    );
+    // Push the new entry into UI state immediately rather than waiting for the
+    // next tick, so the confirmation screen has something to track at once.
+    setOutbox(engine.outbox.all());
+    return packet.packetId;
   }, []);
 
   const setStatus = useCallback<MeshState['setStatus']>((packetId, status) => {
@@ -289,6 +337,9 @@ export function useMesh(): MeshState {
     clusters,
     peers,
     estimates,
+    bridge,
+    bridgeWarning: bridgeMessage(bridge),
+    battery,
     outbox,
     log,
     stats,

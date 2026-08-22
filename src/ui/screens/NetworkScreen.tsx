@@ -2,7 +2,8 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { C, s } from '../theme';
 import { callsign } from '../../services/nodeIdentity';
-import { formatDistance, haversineMeters } from '../../core/geo';
+import { haversineMeters } from '../../core/geo';
+import { describeProximity } from '../../core/localization';
 import type { MeshState } from '../../state/useMesh';
 
 function ago(ms: number): string {
@@ -39,6 +40,24 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
         </Text>
       </View>
 
+      {mesh.bridgeWarning && (
+        <View
+          style={[
+            s.panel,
+            { borderColor: C.soon, borderWidth: 2, backgroundColor: '#FFFBF3' },
+          ]}
+        >
+          <Text style={{ fontSize: 17, fontWeight: '600', color: C.ink }}>
+            You are holding this group together
+          </Text>
+          <Text style={[s.meta, { lineHeight: 22 }]}>{mesh.bridgeWarning}</Text>
+          <Text style={s.quiet}>
+            Your phone is currently the only link between them. If you need to move, try to
+            leave a phone here, or move slowly so they can find another route.
+          </Text>
+        </View>
+      )}
+
       {relayed > 0 && (
         <Text style={s.quiet}>
           {relayed} phone{relayed === 1 ? ' is' : 's are'} too far to reach directly. Others are
@@ -61,20 +80,27 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
           </Text>
         )}
         {mesh.peers.map((p) => {
-          const dist =
+          const gps =
             mesh.fix && p.lat != null && p.lon != null
-              ? formatDistance(haversineMeters(mesh.fix, { lat: p.lat, lon: p.lon }))
+              ? haversineMeters(mesh.fix, { lat: p.lat, lon: p.lon })
               : null;
+          const prox = describeProximity({ hops: p.hops, rssi: p.rssi, gpsDistanceM: gps });
+          const low = p.battery != null && p.battery <= 20;
           return (
             <View key={p.nodeId} style={s.listRow}>
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={s.rowText}>{callsign(p.nodeId)}</Text>
                 <Text style={s.quiet}>
-                  {p.hops === 0 ? 'Direct' : `Through another phone · ${p.hops} hops`}
-                  {dist ? ` · ${dist} away` : p.lat == null ? ' · position unknown' : ''}
+                  {prox.detail}
+                  {p.battery != null ? ` · battery ${p.battery}%` : ''}
                 </Text>
+                {low && (
+                  <Text style={{ fontSize: 13, color: C.soon }}>
+                    Low battery — may drop off the network soon
+                  </Text>
+                )}
               </View>
-              <Bars rssi={p.rssi} />
+              <Bars rssi={p.rssi} hops={p.hops} />
             </View>
           );
         })}
@@ -134,9 +160,10 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
   );
 }
 
-function Bars({ rssi }: { rssi: number }) {
-  // -50 strong, -90 weak.
-  const level = rssi >= -60 ? 3 : rssi >= -75 ? 2 : 1;
+function Bars({ rssi, hops }: { rssi: number; hops: number }) {
+  // A relayed peer's signal strength is the relay's, not theirs — showing bars
+  // for it would be a confident lie, so show none.
+  const level = hops > 0 ? 0 : rssi >= -60 ? 3 : rssi >= -75 ? 2 : 1;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 16 }}>
       {[6, 11, 16].map((h, i) => (

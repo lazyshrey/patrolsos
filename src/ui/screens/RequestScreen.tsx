@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { SendConfirmation } from '../SendConfirmation';
 
 import { C, s, TRIAGE_COLOR } from '../theme';
 import { Category, Triage } from '../../types';
@@ -28,7 +29,7 @@ export function RequestScreen({ mesh }: { mesh: MeshState }) {
   const [triage, setTriage] = useState<Triage>(Triage.RED);
   const [people, setPeople] = useState(1);
   const [preset, setPreset] = useState<number>(1);
-  const [sentAt, setSentAt] = useState<number | null>(null);
+  const [sentId, setSentId] = useState<number | null>(null);
 
   const presets = PRESETS_BY_CATEGORY[category] ?? [0];
 
@@ -38,13 +39,25 @@ export function RequestScreen({ mesh }: { mesh: MeshState }) {
   }
 
   function send() {
-    mesh.report({ category, triage, casualties: people, descPreset: preset });
-    setSentAt(Date.now());
+    const id = mesh.report({ category, triage, casualties: people, descPreset: preset });
+    if (id != null) setSentId(id);
   }
+
+  const sentEntry = sentId != null ? (mesh.outbox.find((e) => e.packetId === sentId) ?? null) : null;
 
   const gpsLine = mesh.fix
     ? `Location found, accurate to ${Math.round(mesh.fix.acc)} m`
     : 'No location yet — your report still sends';
+
+  if (sentId != null) {
+    return (
+      <SendConfirmation
+        entry={sentEntry}
+        colour={TRIAGE_COLOR[triage]}
+        onDone={() => setSentId(null)}
+      />
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={s.body}>
@@ -203,9 +216,7 @@ export function RequestScreen({ mesh }: { mesh: MeshState }) {
           <Text style={s.primaryText}>Send</Text>
         </Pressable>
         <Text style={[s.quiet, { textAlign: 'center' }]}>
-          {sentAt
-            ? 'Sent. Check Incidents to see when a nearby phone picks it up.'
-            : 'Works with no signal. Passes phone to phone until it reaches help.'}
+          Works with no signal. Passes phone to phone until it reaches help.
         </Text>
       </View>
     </ScrollView>

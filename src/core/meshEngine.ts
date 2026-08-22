@@ -196,7 +196,7 @@ export class MeshEngine {
    * the map. Same 20-byte frame, low TTL, and it replaces any previous presence
    * from this node in the rotation rather than piling up.
    */
-  announcePresence(lat: number, lon: number): Packet {
+  announcePresence(lat: number, lon: number, batteryPercent = 255): Packet {
     const at = this.now();
     this.lamport = nextLamport(this.lamport, this.lamport);
 
@@ -206,7 +206,9 @@ export class MeshEngine {
       lon,
       category: Category.PRESENCE,
       triage: 4 as Triage,
-      casualties: 0,
+      // The spare byte carries battery level. A relay network made of phones
+      // needs to know which of its relays are about to die: 255 means unknown.
+      casualties: Math.min(255, Math.max(0, Math.round(batteryPercent))),
       ttl: PRESENCE_TTL,
       hops: 0,
       lamport: this.lamport,
@@ -334,6 +336,16 @@ export class MeshEngine {
       }
     }
 
+    // PEER LIVENESS MUST ALSO RUN BEFORE THE SEEN CHECK.
+    //
+    // In a steady state almost everything we hear is a duplicate — each node
+    // re-advertises its rotation about once a second. If liveness only updated
+    // on genuinely NEW packets, a peer standing right next to you with nothing
+    // new to say would go stale after PEER_STALE_MS and disappear from the peer
+    // list, and its signal meter would freeze at whatever it last happened to
+    // be. Hearing a duplicate is still hearing them.
+    this.touchPeer(packet, rssi, at);
+
     if (this.seen.has(key)) {
       this.stats.dropped++;
       this.pushLog('drop', packet.packetId, 'already seen');
@@ -342,7 +354,6 @@ export class MeshEngine {
 
     this.markSeen(key);
     this.stats.heard++;
-    this.touchPeer(packet, rssi, at);
     this.pushLog('rx', packet.packetId, `ttl ${packet.ttl} hops ${packet.hops}`);
 
     // Presence and observations are peer metadata, not incidents.
@@ -486,16 +497,42 @@ export class MeshEngine {
     const prev = this.peers.get(nodeId);
     const isPresence = packet.category === Category.PRESENCE;
 
+    // Raw RSSI jumps 10+ dB between consecutive packets from a stationary
+    // phone — body position, orientation and multipath all move it. An
+    // exponential moving average turns a twitching bar into one that tracks
+    // real movement. Only smooth a DIRECT reading: a relayed packet's RSSI is
+    // the strength of the relay, not of the original sender.
+    const direct = packet.hops === 0;
+    const smoothed =
+      direct && prev && prev.rssi !== 0 ? Math.round(prev.rssi * 0.7 + rssi * 0.3) : rssi;
+
+    // A presence packet can arrive by a slow relay path long after a fresher
+    // one came direct. Accepting it would drag the peer's pin backwards to
+    // where they used to be, so position only ever moves forward in logical
+    // time.
+    const fresherPresence =
+      isPresence && (prev?.presenceLamport == null || packet.lamport >= prev.presenceLamport);
+
+    // Route quality has to be able to degrade. Sticky "best ever" hops would
+    // keep showing someone as directly reachable long after they walked out of
+    // range, because relayed copies keep the entry alive.
+    const heardDirectlyRecently =
+      direct || (prev?.lastDirectAt != null && at - prev.lastDirectAt < PEER_STALE_MS);
+
     this.peers.set(nodeId, {
       nodeId,
-      rssi,
+      rssi: direct ? smoothed : (prev?.rssi ?? rssi),
       lastSeen: at,
+      lastDirectAt: direct ? at : prev?.lastDirectAt,
       packetsHeard: (prev?.packetsHeard ?? 0) + 1,
-      hops: packet.hops,
+      hops: heardDirectlyRecently ? 0 : packet.hops,
       // Only a presence packet states where the peer itself is. An incident
       // packet's coordinates are the incident's, not the sender's.
-      lat: isPresence ? packet.lat : prev?.lat,
-      lon: isPresence ? packet.lon : prev?.lon,
+      lat: fresherPresence ? packet.lat : prev?.lat,
+      lon: fresherPresence ? packet.lon : prev?.lon,
+      presenceLamport: fresherPresence ? packet.lamport : prev?.presenceLamport,
+      battery:
+        fresherPresence && packet.casualties <= 100 ? packet.casualties : prev?.battery,
     });
   }
 

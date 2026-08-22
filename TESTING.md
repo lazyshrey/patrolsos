@@ -16,7 +16,7 @@ until this is answered.
 adb devices
 ```
 
-The APK is at `android/app/build/outputs/apk/release/app-release.apk`. It is
+The APK is at `patrol-v0.2-test.apk` in the project root. It is
 signed with the standard debug keystore, so it installs on any phone with
 "install from unknown sources" allowed. It is a **release** build — the JS is
 bundled in, so the phones do **not** need to stay near your laptop or have
@@ -25,7 +25,7 @@ Metro running.
 Install to each phone:
 
 ```bash
-adb -s <SERIAL> install -r android/app/build/outputs/apk/release/app-release.apk
+adb -s <SERIAL> install -r patrol-v0.2-test.apk
 ```
 
 Or copy the APK over and tap it on each device.
@@ -145,7 +145,30 @@ same packet many times and ignore all but the first.
 
 - Node id is regenerated on every launch (persisting it needs a storage
   dependency and another rebuild). Written down on screen so you can track it.
-- No deduplication, no map, no resource matching yet — engine only.
+- No map or resource matching in the UI yet. Deduplication and peer positions are implemented and tested; the map that renders them is the next step.
 - The UI is a test harness, not the designed app.
 - Packets are unsigned. Anyone could inject a false report. Documented
   trade-off: a 64-byte signature does not fit in a 20-byte advertisement.
+
+---
+
+## Test 6 — peer positions (v0.2)
+
+Each phone now broadcasts a PRESENCE packet every 15 seconds carrying its own
+GPS position. This is the dataset the map layer will render.
+
+1. Start the mesh on all three phones, outdoors or near a window so GPS locks.
+2. Wait ~20 seconds.
+3. The **Peers** panel on each phone should list the other two:
+   - a **green dot** and `direct` for a phone in radio range
+   - an **amber dot** and `via relay` for one reached through another phone
+   - coordinates and a distance for any peer that has sent a presence packet
+4. Walk one phone away. Its distance should update within ~15 s.
+5. Turn one phone off. It should disappear from Peers within ~30 s.
+
+If a peer shows `position unknown`, that phone has no GPS fix yet — it is still
+relaying fine, it just has no coordinates to share. Indoors this is common.
+
+Presence uses **TTL 2**, so a peer three or more hops away deliberately will not
+appear. That is intended: flooding everyone's coordinates across the whole mesh
+would drown the incident traffic that actually matters.

@@ -277,20 +277,60 @@ and no Android build in the loop.
 
 ---
 
-## 5. Map — do NOT use `react-native-maps`
+## 5. Map — MapLibre with a pre-downloaded region
 
-Google and Apple tiles require internet. Our entire premise is *no internet*. A demo map
-showing grey squares kills the pitch.
+**Never `react-native-maps`.** Google and Apple tiles require internet. Our entire
+premise is *no internet*, and a map of grey squares kills the pitch.
 
-**Ship instead:** a `react-native-svg` tactical plot. Equirectangular projection of
-lat/lon into viewport coordinates, auto-fitting bounds to the incident set, over a
-bundled static satellite PNG of the demo area with known corner coordinates. Pinch-zoom
-and pan via `react-native-gesture-handler`. Renders triage-coloured pins, GPS accuracy
-circles, cluster rings sized by `reportCount`, and dashed dispatch lines from resource
-to target.
+**Ship:** `@maplibre/maplibre-react-native` — **MIT**, v11.3.6, actively maintained.
 
-Cost: about 45 minutes. Genuinely offline. Reads more "tactical ops" than a consumer
-map, which suits the pitch better anyway.
+Two ways to get tiles onto the phone, in order of preference:
+
+1. **Offline packs** (`OfflineManager.createPack`) — pick a bounding box and zoom
+   range while online, MapLibre downloads the tiles into a local SQLite store, and
+   the map then renders fully offline forever. Battle-tested, first-class in the
+   library. Needs internet *at preparation time only*, which is exactly right: you
+   stage the region before deploying into the disaster zone.
+2. **PMTiles** — a single-file tile archive (`pmtiles` npm, BSD-3-Clause) bundled
+   into the APK from a Protomaps extract. Zero preparation step for the user and
+   nothing to download, but RN-side support is less proven than offline packs.
+   Verify before committing to it.
+
+**Overlays** are plain GeoJSON through `ShapeSource` + `CircleLayer` / `SymbolLayer`:
+
+| Layer | Source |
+| --- | --- |
+| Incident pins, triage-coloured | `getIncidents()` |
+| Cluster rings sized by `reportCount` | `clusterIncidents()` |
+| **Peer positions** | `getPeers()` — see §5.1 |
+| Your own position | `expo-location` |
+| Dispatch lines | resource → target |
+
+Cost: ~3 h including the offline pack plumbing. That is real budget — if the clock is
+tight, the fallback is the `react-native-svg` tactical plot (~45 min): equirectangular
+lat/lon projection over a bundled static PNG with known corner coordinates. It looks
+close to the mockup and is genuinely offline, it just cannot pan/zoom over real terrain.
+
+### 5.1 Peer positions on the map — `Category.PRESENCE`
+
+Showing where every peer is needs no new wire format. A **presence packet** is the same
+20 bytes, reinterpreted: `lat`/`lon` are the *sender's own* coordinates rather than an
+incident's, and `originNodeId` says who. Category 8.
+
+- **TTL 2**, not 7 — only nearby nodes care where you are, and flooding the mesh with
+  everyone's coordinates would drown the incident traffic that actually matters.
+- Only the **newest presence per node** stays in the broadcast rotation, so a moving
+  peer cannot fill it with a breadcrumb trail.
+- Presence **never enters the incident store**. It updates `PeerState.lat/lon` only.
+- An incident packet must never overwrite a peer's position — the incident is somewhere
+  the reporter is looking at, not where the reporter is standing. There is a test for
+  exactly this.
+
+Peers therefore arrive at the map layer as `getPeers()` with `{nodeId, lat, lon, hops,
+rssi, lastSeen}` — ready to render, with `hops === 0` meaning "heard directly".
+
+**Peer loss is inferred from 30 s of silence.** Neither Android's scanner nor iOS
+CoreBluetooth provides a reliable "peer lost" callback.
 
 ---
 

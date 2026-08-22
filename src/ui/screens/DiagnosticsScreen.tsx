@@ -13,6 +13,7 @@ import { callsign } from '../../services/nodeIdentity';
 import { shortId } from '../../proto/codec';
 import { CATEGORY_LABEL, TRIAGE_LABEL } from '../../proto/presets';
 import { Triage, type PacketEvent } from '../../types';
+import { SCAN_OFF_MS, SCAN_ON_MS } from '../../transport/BleTransport';
 import type { MeshState } from '../../state/useMesh';
 
 export function DiagnosticsScreen({ mesh }: { mesh: MeshState }) {
@@ -77,6 +78,14 @@ export function DiagnosticsScreen({ mesh }: { mesh: MeshState }) {
             GPS {mesh.fix.lat.toFixed(5)}, {mesh.fix.lon.toFixed(5)} ±{Math.round(mesh.fix.acc)} m
           </Text>
         )}
+        <Text style={s.code}>
+          radio · advertising continuously · listening {SCAN_ON_MS / 1000}s in every{' '}
+          {(SCAN_ON_MS + SCAN_OFF_MS) / 1000}s
+        </Text>
+        <Text style={s.quiet}>
+          Only listening is cycled. A phone that stops advertising goes invisible; one that
+          stops listening for a few seconds just hears the packet on the next pass.
+        </Text>
       </View>
 
       <View style={{ flexDirection: 'row', gap: 8 }}>

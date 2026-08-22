@@ -21,3 +21,4 @@ local.properties
 # Native module build output
 modules/*/android/build/
 modules/*/android/.cxx/
+modules/*/android/.gradle/

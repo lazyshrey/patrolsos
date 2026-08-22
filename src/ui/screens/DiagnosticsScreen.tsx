@@ -123,6 +123,31 @@ export function DiagnosticsScreen({ mesh }: { mesh: MeshState }) {
       </View>
 
       <View style={s.panel}>
+        <Text style={s.sectionLabel}>Stored data</Text>
+        <Text style={s.quiet}>
+          {mesh.restored
+            ? 'Reports from a previous session were restored on launch.'
+            : 'Reports and your node id are saved to this phone and survive a restart.'}
+        </Text>
+        <Pressable
+          onPress={mesh.reset}
+          style={{
+            height: 46,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: C.line,
+            backgroundColor: C.card,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: C.now, fontSize: 15, fontWeight: '500' }}>
+            Clear stored reports
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={s.panel}>
         <Text style={s.sectionLabel}>Packet trace</Text>
         {mesh.log.length === 0 && <Text style={s.quiet}>No traffic yet.</Text>}
         {mesh.log.map((ev, i) => (

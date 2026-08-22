@@ -27,7 +27,7 @@ import { Category } from '../types';
 import { DEFAULT_TTL, MAX_HOPS, decodePacket, encodePacket, shortId } from '../proto/codec';
 import { computePacketId, type Sha256Fn } from '../proto/packetId';
 import { incidentFromPacket, mergeIncident, nextLamport } from './crdt';
-import { Outbox } from './outbox';
+import { Outbox, type OutboxEntry } from './outbox';
 import {
   estimateLocation,
   type LocationEstimate,
@@ -540,6 +540,32 @@ export class MeshEngine {
 
   private emit(): void {
     this.onChange?.();
+  }
+
+  /**
+   * Restore state saved before the app was killed.
+   *
+   * Restored incidents go straight into the store rather than through
+   * receive(): they are already-merged local state, not something a peer just
+   * told us, so re-running the relay logic would put stale packets back on the
+   * air with a fresh hop budget.
+   *
+   * The outbox IS re-broadcast: an undelivered report should keep trying.
+   */
+  hydrate(incidents: Incident[], outboxEntries: OutboxEntry[]): void {
+    for (const inc of incidents) {
+      this.incidents.set(inc.packetId, inc);
+      if (inc.lamport > this.lamport) this.lamport = inc.lamport;
+    }
+
+    this.outbox.load(outboxEntries);
+    for (const entry of this.outbox.pending()) {
+      this.enqueue(entry.packet);
+      this.markSeen(this.seenKey(entry.packet));
+    }
+
+    this.rebuildRotation();
+    this.emit();
   }
 
   // -------------------------------------------------------------------------

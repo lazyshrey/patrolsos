@@ -13,6 +13,16 @@ import { MeshEngine } from '../core/meshEngine';
 import { BleTransport } from '../transport/BleTransport';
 import { sha256 } from '../services/sha256';
 import { generateNodeId } from '../services/nodeIdentity';
+import {
+  clearAll,
+  initStorage,
+  loadIncidents,
+  loadNodeId,
+  loadOutbox,
+  saveIncidents,
+  saveNodeId,
+  saveOutbox,
+} from '../services/storage';
 import { clusterIncidents, type Cluster } from '../core/deduplicator';
 import type { LocationEstimate } from '../core/localization';
 import type { OutboxEntry } from '../core/outbox';
@@ -22,6 +32,7 @@ import type { Category, Incident, PacketEvent, PeerState, Status, Triage } from 
 const UI_TICK_MS = 800;
 const PRESENCE_MS = 15_000;
 const OBSERVATION_MS = 25_000;
+const PERSIST_MS = 10_000;
 
 export interface Fix {
   lat: number;
@@ -54,10 +65,13 @@ export interface MeshState {
     descPreset: number;
   }) => void;
   setStatus: (packetId: number, status: Status) => void;
+  reset: () => Promise<void>;
+  restored: boolean;
 }
 
 export function useMesh(): MeshState {
   const nodeIdRef = useRef(generateNodeId());
+  const hydratedRef = useRef(false);
   const engineRef = useRef<MeshEngine | null>(null);
   const fixRef = useRef<Fix | null>(null);
   const timers = useRef<Array<ReturnType<typeof setInterval>>>([]);
@@ -68,6 +82,8 @@ export function useMesh(): MeshState {
   const [error, setError] = useState<string | null>(null);
   const [bleStatus, setBleStatus] = useState<BleStatus | null>(null);
   const [fix, setFix] = useState<Fix | null>(null);
+  const [nodeId, setNodeId] = useState(nodeIdRef.current);
+  const [restored, setRestored] = useState(false);
 
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
@@ -76,6 +92,27 @@ export function useMesh(): MeshState {
   const [outbox, setOutbox] = useState<OutboxEntry[]>([]);
   const [log, setLog] = useState<PacketEvent[]>([]);
   const [stats, setStats] = useState({ heard: 0, relayed: 0, originated: 0, dropped: 0 });
+
+  // Identity must survive a restart, or a phone looks like a brand new device
+  // to its neighbours every time Android kills the app.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ok = await initStorage();
+      if (!ok || cancelled) return;
+      let id = await loadNodeId();
+      if (id == null) {
+        id = generateNodeId();
+        await saveNodeId(id);
+      }
+      if (cancelled) return;
+      nodeIdRef.current = id;
+      setNodeId(id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Radio preflight, polled so the user sees Location being switched on.
   useEffect(() => {
@@ -105,6 +142,18 @@ export function useMesh(): MeshState {
       setStats({ ...e.stats });
     }, UI_TICK_MS);
     timers.current.push(t);
+    return () => clearInterval(t);
+  }, []);
+
+  // Flush to disk on a slow timer. Writing on every packet would hammer the
+  // database for no benefit — the mesh re-delivers anything lost in a 10 s gap.
+  useEffect(() => {
+    const t = setInterval(() => {
+      const e = engineRef.current;
+      if (!e) return;
+      void saveIncidents(e.getIncidents());
+      void saveOutbox(e.outbox.all());
+    }, PERSIST_MS);
     return () => clearInterval(t);
   }, []);
 
@@ -150,11 +199,24 @@ export function useMesh(): MeshState {
       }
 
       const engine = new MeshEngine({
+        // The ref, not the state: this callback has an empty dependency list,
+        // so the state value here would still be the pre-load random id.
         nodeId: nodeIdRef.current,
         transport: new BleTransport(),
         sha256,
       });
       engineRef.current = engine;
+
+      // Restore what we knew before the app was killed, once per launch.
+      if (!hydratedRef.current) {
+        hydratedRef.current = true;
+        const [saved, savedOutbox] = await Promise.all([loadIncidents(), loadOutbox()]);
+        if (saved.length > 0 || savedOutbox.length > 0) {
+          engine.hydrate(saved, savedOutbox);
+          setRestored(true);
+        }
+      }
+
       await engine.start();
 
       // "I am here" — puts this phone on other people's maps.
@@ -211,8 +273,13 @@ export function useMesh(): MeshState {
     engineRef.current?.setStatus(packetId, status);
   }, []);
 
+  const reset = useCallback(async () => {
+    await clearAll();
+    setRestored(false);
+  }, []);
+
   return {
-    nodeId: nodeIdRef.current,
+    nodeId,
     running,
     busy,
     error,
@@ -229,5 +296,7 @@ export function useMesh(): MeshState {
     stop,
     report,
     setStatus,
+    reset,
+    restored,
   };
 }

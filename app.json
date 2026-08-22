@@ -33,7 +33,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "PATROL uses your location to place emergency reports on the offline map."
         }
-      ]
+      ],
+      "expo-sqlite"
     ]
   }
 }

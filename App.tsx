@@ -28,7 +28,8 @@ import { sha256 } from './src/services/sha256';
 import { callsign, generateNodeId } from './src/services/nodeIdentity';
 import { shortId } from './src/proto/codec';
 import { CATEGORY_LABEL, STATUS_LABEL, TRIAGE_LABEL, describe } from './src/proto/presets';
-import { Category, Status, Triage, type Incident, type PacketEvent } from './src/types';
+import { formatDistance, haversineMeters } from './src/core/geo';
+import { Category, Status, Triage, type Incident, type PacketEvent, type PeerState } from './src/types';
 import type { BleStatus } from './modules/patrol-ble/src/PatrolBleModule';
 
 const C = {
@@ -56,11 +57,16 @@ export default function App() {
   const nodeIdRef = useRef<number>(generateNodeId());
   const engineRef = useRef<MeshEngine | null>(null);
   const transportRef = useRef<BleTransport | null>(null);
+  // Latest fix, kept in a ref so the presence timer never closes over stale state.
+  const coordsRef = useRef<{ lat: number; lon: number } | null>(null);
+  const presenceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const watchRef = useRef<Location.LocationSubscription | null>(null);
 
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<BleStatus | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [peers, setPeers] = useState<PeerState[]>([]);
   const [log, setLog] = useState<PacketEvent[]>([]);
   const [stats, setStats] = useState({ heard: 0, relayed: 0, originated: 0, dropped: 0 });
   const [coords, setCoords] = useState<{ lat: number; lon: number; acc: number } | null>(null);
@@ -89,6 +95,7 @@ export default function App() {
       const e = engineRef.current;
       if (!e) return;
       setIncidents(e.getIncidents());
+      setPeers(e.getPeers());
       setLog(e.getLog().slice(0, 40));
       setStats({ ...e.stats });
     }, 700);
@@ -114,11 +121,26 @@ export default function App() {
           const pos = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
-          setCoords({
+          const c = {
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
             acc: pos.coords.accuracy ?? 0,
-          });
+          };
+          coordsRef.current = c;
+          setCoords(c);
+
+          watchRef.current = await Location.watchPositionAsync(
+            { accuracy: Location.Accuracy.Balanced, distanceInterval: 5, timeInterval: 5000 },
+            (p) => {
+              const next = {
+                lat: p.coords.latitude,
+                lon: p.coords.longitude,
+                acc: p.coords.accuracy ?? 0,
+              };
+              coordsRef.current = next;
+              setCoords(next);
+            }
+          );
         }
       } catch {
         // no fix; originate() will use the fallback below
@@ -130,6 +152,15 @@ export default function App() {
       engineRef.current = engine;
 
       await engine.start();
+
+      // "I am here", every 15 s. This is what puts peers on the map.
+      const beacon = () => {
+        const c = coordsRef.current;
+        if (c) engine.announcePresence(c.lat, c.lon);
+      };
+      beacon();
+      presenceTimer.current = setInterval(beacon, 15_000);
+
       setRunning(true);
       refreshStatus();
     } catch (e) {
@@ -141,6 +172,10 @@ export default function App() {
 
   const stopMesh = useCallback(async () => {
     setBusy(true);
+    if (presenceTimer.current) clearInterval(presenceTimer.current);
+    presenceTimer.current = null;
+    watchRef.current?.remove();
+    watchRef.current = null;
     try {
       await engineRef.current?.stop();
     } catch {
@@ -260,6 +295,41 @@ export default function App() {
           <Stat label="relayed" value={stats.relayed} />
           <Stat label="sent" value={stats.originated} />
           <Stat label="dropped" value={stats.dropped} />
+        </View>
+
+        {/* Peers — the dataset a map layer would render */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Peers ({peers.length})</Text>
+          {peers.length === 0 && <Text style={s.hint}>No other phones heard yet.</Text>}
+          {peers.map((p) => {
+            const here = coords;
+            const dist =
+              here && p.lat != null && p.lon != null
+                ? formatDistance(haversineMeters(here, { lat: p.lat, lon: p.lon }))
+                : null;
+            return (
+              <View key={p.nodeId} style={s.row}>
+                <View
+                  style={[
+                    s.dot,
+                    { backgroundColor: p.hops === 0 ? C.green : C.amber },
+                  ]}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowText}>{callsign(p.nodeId)}</Text>
+                  <Text style={s.incMeta}>
+                    {p.hops === 0 ? 'direct' : `via relay · ${p.hops} hops`} · {p.rssi} dBm ·{' '}
+                    {p.packetsHeard} pkts
+                  </Text>
+                  <Text style={s.incMeta}>
+                    {p.lat != null
+                      ? `${p.lat.toFixed(5)}, ${p.lon!.toFixed(5)}${dist ? ` · ${dist} away` : ''}`
+                      : 'position unknown'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
 
         {/* Incidents */}

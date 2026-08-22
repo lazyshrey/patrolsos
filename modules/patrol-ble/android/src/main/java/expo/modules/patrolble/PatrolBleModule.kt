@@ -188,6 +188,12 @@ class PatrolBleModule : Module() {
       // flowing. Without it each advertiser is heard once and the mesh dies.
       .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
       .setReportDelay(0)
+      // Aggressive matching: in a disaster zone peers appear and vanish as
+      // people move, and the conservative default matcher trades exactly the
+      // latency we cannot afford for battery we would rather spend.
+      // (Approach borrowed from protestchat, MIT licensed.)
+      .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+      .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
       .build()
 
     val cb = object : ScanCallback() {

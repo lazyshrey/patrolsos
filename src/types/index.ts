@@ -20,6 +20,13 @@ export const Category = {
   MISSING: 5,
   FIRE: 6,
   STRUCTURAL: 7,
+  /**
+   * "I am here." Carries the sender's own GPS position rather than an incident.
+   * Reuses the exact same 20-byte frame — lat/lon are the node's coordinates and
+   * originNodeId identifies it — so peer positions cost no new wire format.
+   * Broadcast on a low TTL: only nearby nodes care where you are.
+   */
+  PRESENCE: 8,
   RESOURCE_OFFER: 12,
   DISPATCH: 13,
   GOSSIP_DIGEST: 14,
@@ -109,6 +116,11 @@ export interface PeerState {
   rssi: number;
   lastSeen: number;
   packetsHeard: number;
+  /** From that peer's PRESENCE packets. Undefined until one arrives. */
+  lat?: number;
+  lon?: number;
+  /** 0 = heard directly off the radio; higher = reached through a relay. */
+  hops: number;
 }
 
 export type PacketDirection = 'rx' | 'tx' | 'drop' | 'merge';

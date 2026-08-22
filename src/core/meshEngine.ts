@@ -15,7 +15,6 @@
  */
 
 import type {
-  Category,
   Incident,
   Packet,
   PacketEvent,
@@ -24,6 +23,7 @@ import type {
   Transport,
   Triage,
 } from '../types';
+import { Category } from '../types';
 import { DEFAULT_TTL, MAX_HOPS, decodePacket, encodePacket, shortId } from '../proto/codec';
 import { computePacketId, type Sha256Fn } from '../proto/packetId';
 import { incidentFromPacket, mergeIncident, nextLamport } from './crdt';
@@ -34,6 +34,18 @@ const LOG_CAP = 200;
 const GC_INTERVAL_MS = 60_000;
 const RESOLVED_TTL_MS = 30 * 60 * 1000;
 const STORE_CAP = 5000;
+
+/** Presence is local-interest only — no point flooding the whole mesh with it. */
+const PRESENCE_TTL = 2;
+
+/**
+ * No packet from a peer for this long means it is gone.
+ *
+ * Neither Android's scanner nor iOS CoreBluetooth gives a reliable "peer lost"
+ * callback, so loss has to be inferred from silence. (Same conclusion as
+ * protestchat, MIT licensed.)
+ */
+export const PEER_STALE_MS = 30_000;
 
 export interface MeshEngineOptions {
   nodeId: number;
@@ -146,6 +158,37 @@ export class MeshEngine {
     return packet;
   }
 
+  /**
+   * "I am here." Broadcasts this node's own position so peers can be drawn on
+   * the map. Same 20-byte frame, low TTL, and it replaces any previous presence
+   * from this node in the rotation rather than piling up.
+   */
+  announcePresence(lat: number, lon: number): Packet {
+    const at = this.now();
+    this.lamport = nextLamport(this.lamport, this.lamport);
+
+    const packet: Packet = {
+      packetId: computePacketId(this.sha256, lat, lon, Category.PRESENCE, this.nodeId, at),
+      lat,
+      lon,
+      category: Category.PRESENCE,
+      triage: 4 as Triage,
+      casualties: 0,
+      ttl: PRESENCE_TTL,
+      hops: 0,
+      lamport: this.lamport,
+      status: 0 as Status,
+      descPreset: 0,
+      originNodeId: this.nodeId,
+    };
+
+    this.markSeen(this.seenKey(packet));
+    this.enqueue(packet);
+    this.rebuildRotation();
+    this.emit();
+    return packet;
+  }
+
   /** Advance an incident's status and gossip the change back out. */
   setStatus(packetId: number, status: Status): Packet | null {
     const inc = this.incidents.get(packetId);
@@ -204,10 +247,13 @@ export class MeshEngine {
 
     this.markSeen(key);
     this.stats.heard++;
-    this.touchPeer(packet.originNodeId, rssi, at);
+    this.touchPeer(packet, rssi, at);
     this.pushLog('rx', packet.packetId, `ttl ${packet.ttl} hops ${packet.hops}`);
 
-    this.ingest(packet, at, false);
+    // Presence is peer metadata, not an incident — never goes in the store.
+    if (packet.category !== Category.PRESENCE) {
+      this.ingest(packet, at, false);
+    }
 
     // Relay with a decremented hop budget.
     if (packet.ttl > 0) {
@@ -247,7 +293,15 @@ export class MeshEngine {
 
   /** Add or replace a packet in the rotation, newest version wins. */
   private enqueue(packet: Packet): void {
-    this.rotation = [packet, ...this.rotation.filter((p) => p.packetId !== packet.packetId)];
+    const stale = (p: Packet) =>
+      p.packetId === packet.packetId ||
+      // Only the newest presence per node is worth broadcasting — otherwise a
+      // moving peer fills the rotation with its own breadcrumb trail.
+      (packet.category === Category.PRESENCE &&
+        p.category === Category.PRESENCE &&
+        p.originNodeId === packet.originNodeId);
+
+    this.rotation = [packet, ...this.rotation.filter((p) => !stale(p))];
   }
 
   /**
@@ -291,19 +345,33 @@ export class MeshEngine {
   // Housekeeping
   // -------------------------------------------------------------------------
 
-  private touchPeer(nodeId: number, rssi: number, at: number): void {
+  private touchPeer(packet: Packet, rssi: number, at: number): void {
+    const nodeId = packet.originNodeId;
     if (nodeId === this.nodeId) return;
     const prev = this.peers.get(nodeId);
+    const isPresence = packet.category === Category.PRESENCE;
+
     this.peers.set(nodeId, {
       nodeId,
       rssi,
       lastSeen: at,
       packetsHeard: (prev?.packetsHeard ?? 0) + 1,
+      hops: packet.hops,
+      // Only a presence packet states where the peer itself is. An incident
+      // packet's coordinates are the incident's, not the sender's.
+      lat: isPresence ? packet.lat : prev?.lat,
+      lon: isPresence ? packet.lon : prev?.lon,
     });
   }
 
   private gc(): void {
     const at = this.now();
+
+    // Peer loss is inferred from silence — no platform gives a reliable callback.
+    for (const [id, peer] of this.peers) {
+      if (at - peer.lastSeen > PEER_STALE_MS) this.peers.delete(id);
+    }
+
     for (const [id, inc] of this.incidents) {
       if (inc.status === 3 && at - inc.lastSeen > RESOLVED_TTL_MS) {
         this.incidents.delete(id);

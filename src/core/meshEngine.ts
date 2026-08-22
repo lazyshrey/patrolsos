@@ -28,6 +28,11 @@ import { DEFAULT_TTL, MAX_HOPS, decodePacket, encodePacket, shortId } from '../p
 import { computePacketId, type Sha256Fn } from '../proto/packetId';
 import { incidentFromPacket, mergeIncident, nextLamport } from './crdt';
 import { Outbox } from './outbox';
+import {
+  estimateLocation,
+  type LocationEstimate,
+  type Observation,
+} from './localization';
 
 const SEEN_CAP = 2000;
 const ROTATION_CAP = 24;
@@ -38,6 +43,27 @@ const STORE_CAP = 5000;
 
 /** Presence is local-interest only — no point flooding the whole mesh with it. */
 const PRESENCE_TTL = 2;
+
+/**
+ * Observations travel a little further than presence: the node doing the
+ * trilateration (typically base) is usually not one of the observers.
+ */
+const OBSERVATION_TTL = 4;
+
+/** Stop trusting an observation after this long — people move. */
+const OBSERVATION_STALE_MS = 5 * 60 * 1000;
+
+/**
+ * RSSI is negative and roughly -30..-110 dBm. Store the magnitude so it fits a
+ * u8 byte, and clamp to a sane band so a corrupt byte cannot imply a wild range.
+ */
+function encodeRssi(rssi: number): number {
+  return Math.min(200, Math.max(20, Math.round(-rssi)));
+}
+
+function decodeRssi(byte: number): number {
+  return -Math.min(200, Math.max(20, byte));
+}
 
 /**
  * No packet from a peer for this long means it is gone.
@@ -78,6 +104,7 @@ export class MeshEngine {
   private seen = new Set<string>();
   private seenOrder: string[] = [];
   private peers = new Map<number, PeerState>();
+  private observations = new Map<string, Observation>();
   private log: PacketEvent[] = [];
 
   private lamport = 0;
@@ -195,6 +222,54 @@ export class MeshEngine {
     return packet;
   }
 
+  /**
+   * "I heard node `target` at `rssi`, and I was standing here."
+   *
+   * Only meaningful if WE have a real GPS fix — an observation from an unknown
+   * position tells nobody anything, so callers must not invent coordinates.
+   */
+  announceObservation(targetNodeId: number, rssi: number, lat: number, lon: number): Packet {
+    const at = this.now();
+    this.lamport = nextLamport(this.lamport, this.lamport);
+
+    const packet: Packet = {
+      packetId: computePacketId(this.sha256, lat, lon, Category.OBSERVATION, this.nodeId, at),
+      lat,
+      lon,
+      category: Category.OBSERVATION,
+      triage: 4 as Triage,
+      // Two spare bytes carry the whole observation.
+      casualties: targetNodeId & 0xff,
+      descPreset: encodeRssi(rssi),
+      ttl: OBSERVATION_TTL,
+      hops: 0,
+      lamport: this.lamport,
+      status: 0 as Status,
+      originNodeId: this.nodeId,
+    };
+
+    this.recordObservation(packet, at);
+    this.markSeen(this.seenKey(packet));
+    this.enqueue(packet);
+    this.rebuildRotation();
+    this.emit();
+    return packet;
+  }
+
+  /**
+   * Emit observations for every peer we can currently hear, so other nodes can
+   * trilaterate them. Call on a timer. No-op without our own GPS fix.
+   */
+  sweepObservations(lat: number, lon: number, max = 4): number {
+    const fresh = this.getPeers()
+      .filter((p) => p.rssi !== 0)
+      .slice(0, max);
+    for (const p of fresh) {
+      this.announceObservation(p.nodeId, p.rssi, lat, lon);
+    }
+    return fresh.length;
+  }
+
   /** Advance an incident's status and gossip the change back out. */
   setStatus(packetId: number, status: Status): Packet | null {
     const inc = this.incidents.get(packetId);
@@ -270,8 +345,10 @@ export class MeshEngine {
     this.touchPeer(packet, rssi, at);
     this.pushLog('rx', packet.packetId, `ttl ${packet.ttl} hops ${packet.hops}`);
 
-    // Presence is peer metadata, not an incident — never goes in the store.
-    if (packet.category !== Category.PRESENCE) {
+    // Presence and observations are peer metadata, not incidents.
+    if (packet.category === Category.OBSERVATION) {
+      this.recordObservation(packet, at);
+    } else if (packet.category !== Category.PRESENCE) {
       this.ingest(packet, at, false);
     }
 
@@ -311,6 +388,24 @@ export class MeshEngine {
   // Broadcast rotation
   // -------------------------------------------------------------------------
 
+  /**
+   * File an observation. Keyed on observer+target so a node moving around
+   * refines its reading rather than piling up stale ones.
+   */
+  private recordObservation(packet: Packet, at: number): void {
+    const targetNodeId = packet.casualties;
+    // An observation of ourselves tells us nothing we do not already know.
+    if (targetNodeId === this.nodeId) return;
+
+    this.observations.set(`${packet.originNodeId}:${targetNodeId}`, {
+      observerNodeId: packet.originNodeId,
+      observer: { lat: packet.lat, lon: packet.lon },
+      targetNodeId,
+      rssi: decodeRssi(packet.descPreset),
+      at,
+    });
+  }
+
   /** Ours, and no peer has echoed it back yet. */
   private isUnsent(p: Packet): boolean {
     if (p.originNodeId !== this.nodeId) return false;
@@ -325,7 +420,13 @@ export class MeshEngine {
       // moving peer fills the rotation with its own breadcrumb trail.
       (packet.category === Category.PRESENCE &&
         p.category === Category.PRESENCE &&
-        p.originNodeId === packet.originNodeId);
+        p.originNodeId === packet.originNodeId) ||
+      // Likewise one observation per observer-target pair: repeated readings of
+      // the same peer supersede each other rather than accumulating.
+      (packet.category === Category.OBSERVATION &&
+        p.category === Category.OBSERVATION &&
+        p.originNodeId === packet.originNodeId &&
+        p.casualties === packet.casualties);
 
     this.rotation = [packet, ...this.rotation.filter((p) => !stale(p))];
   }
@@ -404,6 +505,10 @@ export class MeshEngine {
     // Peer loss is inferred from silence — no platform gives a reliable callback.
     for (const [id, peer] of this.peers) {
       if (at - peer.lastSeen > PEER_STALE_MS) this.peers.delete(id);
+    }
+
+    for (const [key, o] of this.observations) {
+      if (at - o.at > OBSERVATION_STALE_MS) this.observations.delete(key);
     }
 
     this.outbox.sweep();
@@ -512,6 +617,31 @@ export class MeshEngine {
 
   getPeers(): PeerState[] {
     return [...this.peers.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+  }
+
+  getObservations(): Observation[] {
+    return [...this.observations.values()];
+  }
+
+  /**
+   * Estimated positions for every node we have observations of.
+   *
+   * Deliberately excludes any node that has told us where it is via a presence
+   * packet — a real GPS fix always beats an RSSI guess, and showing an
+   * uncertainty circle over a phone that knows its own position is noise.
+   */
+  getLocationEstimates(): LocationEstimate[] {
+    const all = this.getObservations();
+    const targets = new Set(all.map((o) => o.targetNodeId));
+
+    const out: LocationEstimate[] = [];
+    for (const target of targets) {
+      const peer = this.peers.get(target);
+      if (peer?.lat != null) continue; // it knows where it is
+      const est = estimateLocation(target, all);
+      if (est) out.push(est);
+    }
+    return out.sort((a, b) => a.uncertaintyM - b.uncertaintyM);
   }
 
   getLog(): PacketEvent[] {

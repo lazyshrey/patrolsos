@@ -27,6 +27,15 @@ export const Category = {
    * Broadcast on a low TTL: only nearby nodes care where you are.
    */
   PRESENCE: 8,
+  /**
+   * "I heard node Y at signal strength Z, and I was standing here."
+   *
+   * The raw material for locating a phone that has no GPS fix of its own.
+   * Reuses the same 20-byte frame: lat/lon are the OBSERVER's position,
+   * originNodeId is the observer, casualties carries the target's node id and
+   * descPreset carries the RSSI magnitude.
+   */
+  OBSERVATION: 9,
   RESOURCE_OFFER: 12,
   DISPATCH: 13,
   GOSSIP_DIGEST: 14,

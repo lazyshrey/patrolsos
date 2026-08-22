@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; }
+    a { color: #16324F; } a:hover { color: #0E2338; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #FAF9F7; color: #1A1917; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- Header -->
+  <div style="padding: 22px 22px 14px 22px; display: flex; align-items: flex-end; justify-content: space-between;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1.1;">Map</div>
+      <div style="font-size: 13px; color: #9C978E;">Stored on this phone &middot; no internet needed</div>
+    </div>
+    <div style="width: 40px; height: 40px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E6E3DE; display: flex; align-items: center; justify-content: center;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1917" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2" fill="#1A1917" stroke="none"></circle><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5"></path></svg>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div style="flex-grow: 1; position: relative; overflow: hidden; border-top: 1px solid #E6E3DE; border-bottom: 1px solid #E6E3DE;">
+    <svg width="390" height="560" viewBox="0 0 390 560" style="display: block;">
+      <defs>
+        <pattern id="blocks" width="74" height="74" patternUnits="userSpaceOnUse" patternTransform="translate(-16,-24)">
+          <rect x="0" y="0" width="62" height="62" rx="1.5" fill="#EAE7E0"></rect>
+        </pattern>
+        <clipPath id="mapclip"><rect x="0" y="0" width="390" height="560"></rect></clipPath>
+      </defs>
+
+      <g clip-path="url(#mapclip)">
+        <!-- road surface -->
+        <rect width="390" height="560" fill="#FCFBF9"></rect>
+        <!-- city blocks -->
+        <rect width="390" height="560" fill="url(#blocks)"></rect>
+
+        <!-- park -->
+        <rect x="206" y="124" width="136" height="136" rx="4" fill="#DFE8D6"></rect>
+        <path d="M232 176c6-10 16-10 22 0M262 214c6-10 16-10 22 0" stroke="#CBD8BE" stroke-width="2" fill="none" stroke-linecap="round"></path>
+
+        <!-- large civic buildings -->
+        <rect x="58" y="272" width="62" height="40" fill="#E0DCD3"></rect>
+        <rect x="132" y="346" width="62" height="62" fill="#E0DCD3"></rect>
+
+        <!-- river -->
+        <path d="M-20 486 C 70 452, 128 526, 214 494 C 292 466, 322 520, 410 496" fill="none" stroke="#D3E1E8" stroke-width="34" stroke-linecap="round"></path>
+        <path d="M-20 486 C 70 452, 128 526, 214 494 C 292 466, 322 520, 410 496" fill="none" stroke="#C4D6DF" stroke-width="1" stroke-linecap="round"></path>
+
+        <!-- arterial road (diagonal, with casing) -->
+        <path d="M-20 60 L 410 380" fill="none" stroke="#E3DFD7" stroke-width="20"></path>
+        <path d="M-20 60 L 410 380" fill="none" stroke="#FFFFFF" stroke-width="16"></path>
+
+        <!-- main vertical avenue -->
+        <path d="M120 -20 L 120 580" fill="none" stroke="#E3DFD7" stroke-width="18"></path>
+        <path d="M120 -20 L 120 580" fill="none" stroke="#FFFFFF" stroke-width="14"></path>
+
+        <!-- bridge -->
+        <path d="M108 468 L 108 508 M132 468 L 132 508" stroke="#D8D3C9" stroke-width="2"></path>
+
+        <!-- street labels -->
+        <text x="130" y="240" fill="#A9A49A" font-size="10" letter-spacing="0.06em" transform="rotate(-90 130 240)">RIVERSIDE AVE</text>
+        <text x="196" y="252" fill="#A9A49A" font-size="10" letter-spacing="0.06em" transform="rotate(36.7 196 252)">STATION ROAD</text>
+        <text x="240" y="150" fill="#9FAE93" font-size="10" letter-spacing="0.06em">CENTRAL PARK</text>
+        <text x="36" y="500" fill="#A3B6BF" font-size="10" letter-spacing="0.06em">RIVER</text>
+      </g>
+
+      <!-- CLUSTER: three merged reports -->
+      <circle cx="163" cy="196" r="52" fill="#D0342C" fill-opacity="0.06"></circle>
+      <circle cx="163" cy="196" r="19" fill="#D0342C" stroke="#FFFFFF" stroke-width="3"></circle>
+      <text x="163" y="202" fill="#FFFFFF" font-size="14" font-weight="600" text-anchor="middle" font-family="Instrument Sans, sans-serif">3</text>
+
+      <!-- other incidents -->
+      <circle cx="298" cy="344" r="11" fill="#D0342C" stroke="#FFFFFF" stroke-width="2.5"></circle>
+      <circle cx="72" cy="392" r="11" fill="#C2820E" stroke="#FFFFFF" stroke-width="2.5"></circle>
+      <circle cx="252" cy="88" r="11" fill="#C2820E" stroke="#FFFFFF" stroke-width="2.5"></circle>
+      <circle cx="326" cy="248" r="8" fill="#2E7D4F" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"></circle>
+
+      <!-- responder + route -->
+      <path d="M66 118 Q 110 142, 148 174" fill="none" stroke="#16324F" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round" stroke-opacity="0.55"></path>
+      <g transform="translate(66, 118)">
+        <rect x="-12" y="-12" width="24" height="24" rx="8" fill="#16324F"></rect>
+        <path d="M-4.5 0h9M0 -4.5v9" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"></path>
+      </g>
+
+      <!-- you -->
+      <circle cx="196" cy="452" r="17" fill="#16324F" fill-opacity="0.1"></circle>
+      <circle cx="196" cy="452" r="6.5" fill="#16324F" stroke="#FFFFFF" stroke-width="2.5"></circle>
+
+      <!-- scale -->
+      <g opacity="0.75">
+        <path d="M22 534h56" stroke="#8A867E" stroke-width="1.4"></path>
+        <path d="M22 530v8M78 530v8" stroke="#8A867E" stroke-width="1.4"></path>
+        <text x="22" y="525" fill="#8A867E" font-size="10">500 m</text>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Selected -->
+  <div style="padding: 18px 22px 26px 22px; display: flex; flex-direction: column; gap: 15px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 4px; height: 42px; border-radius: 999px; background: #D0342C;"></div>
+      <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1;">
+        <div style="font-size: 17px; font-weight: 500;">Trapped under debris</div>
+        <div style="font-size: 14px; color: #6B6862;">6 people &middot; 3 reports merged &middot; 340 m</div>
+      </div>
+      <div style="font-size: 13px; color: #C2820E;">On the way</div>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+      <div style="flex-grow: 1; height: 52px; border-radius: 14px; background: #16324F; display: flex; align-items: center; justify-content: center;">
+        <div style="font-size: 15px; font-weight: 500; color: #FFFFFF;">Send a team</div>
+      </div>
+      <div style="width: 108px; height: 52px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E6E3DE; display: flex; align-items: center; justify-content: center;">
+        <div style="font-size: 15px; font-weight: 500; color: #1A1917;">Resolve</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

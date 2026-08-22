@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; }
+    a { color: #16324F; } a:hover { color: #0E2338; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #FAF9F7; color: #1A1917; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- Header -->
+  <div style="padding: 22px 22px 0 22px; display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1.1;">Supplies</div>
+    <div style="font-size: 13px; color: #9C978E;">4 of 6 available</div>
+  </div>
+
+  <!-- Suggested -->
+  <div style="padding: 22px 22px 0 22px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 500;">Suggested next</div>
+
+    <div style="border-radius: 16px; background: #FFFFFF; border: 1px solid #E6E3DE; padding: 17px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: flex-start; gap: 13px;">
+        <div style="width: 4px; height: 40px; border-radius: 999px; background: #D0342C;"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1;">
+          <div style="font-size: 16px; font-weight: 500;">Rescue Team Alpha</div>
+          <div style="font-size: 14px; color: #6B6862;">2 medics, extraction kit &middot; 0.4 km</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 9px; padding-left: 17px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9C978E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13"></path><path d="M13 6.5l5.5 5.5-5.5 5.5"></path></svg>
+        <div style="font-size: 15px; color: #1A1917;">Trapped under debris</div>
+      </div>
+
+      <div style="font-size: 13px; color: #9C978E; padding-left: 17px; line-height: 1.5;">Nearest team that can do extraction, and the most urgent call within reach.</div>
+
+      <div style="height: 50px; border-radius: 13px; background: #16324F; display: flex; align-items: center; justify-content: center;">
+        <div style="font-size: 15px; font-weight: 500; color: #FFFFFF;">Send them</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 13px; padding: 4px 2px;">
+      <div style="width: 4px; height: 34px; border-radius: 999px; background: #C2820E;"></div>
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 15px; font-weight: 500; color: #6B6862;">Water Bowser 02 &rarr; No clean water</div>
+        <div style="font-size: 13px; color: #9C978E;">500 L &middot; 0.9 km &middot; 7 reports</div>
+      </div>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C7C2B9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+    </div>
+  </div>
+
+  <!-- Inventory -->
+  <div style="flex-grow: 1; padding: 26px 0 0 0; display: flex; flex-direction: column; overflow: hidden;">
+    <div style="font-size: 15px; font-weight: 500; padding: 0 22px 12px 22px;">What we have</div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-top: 1px solid #F0EEEA;">
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 16px;">5 medics</div>
+        <div style="font-size: 13px; color: #9C978E;">Staging area &middot; 0.4 km</div>
+      </div>
+      <div style="font-size: 14px; color: #2E7D4F;">Ready</div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-top: 1px solid #F0EEEA;">
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 16px;">500 L clean water</div>
+        <div style="font-size: 13px; color: #9C978E;">Bowser 02 &middot; 0.9 km</div>
+      </div>
+      <div style="font-size: 14px; color: #2E7D4F;">Ready</div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-top: 1px solid #F0EEEA;">
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 16px;">2 rescue boats</div>
+        <div style="font-size: 13px; color: #9C978E;">River access &middot; 1.6 km</div>
+      </div>
+      <div style="font-size: 14px; color: #C2820E;">Out</div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-top: 1px solid #F0EEEA;">
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 16px;">100 meal packs</div>
+        <div style="font-size: 13px; color: #9C978E;">School gym &middot; 1.1 km</div>
+      </div>
+      <div style="font-size: 14px; color: #2E7D4F;">Ready</div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 15px 22px; border-top: 1px solid #F0EEEA;">
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 16px;">40 blankets</div>
+        <div style="font-size: 13px; color: #9C978E;">School gym &middot; 1.1 km</div>
+      </div>
+      <div style="font-size: 14px; color: #2E7D4F;">Ready</div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div style="display: flex; border-top: 1px solid #E6E3DE; padding: 10px 8px 22px 8px;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9C978E" stroke-width="1.7" stroke-linecap="round"><path d="M12 6v12M6 12h12"></path></svg>
+      <div style="font-size: 11px; color: #9C978E;">Request</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9C978E" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h11"></path></svg>
+      <div style="font-size: 11px; color: #9C978E;">Incidents</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9C978E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3.5 6.5v13L9 17l6 3 5.5-2.5v-13L15 7z"></path><path d="M9 4v13M15 7v13"></path></svg>
+      <div style="font-size: 11px; color: #9C978E;">Map</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#1A1917" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-4 9 4v8l-9 4-9-4z"></path><path d="M3 8l9 4 9-4"></path></svg>
+      <div style="font-size: 11px; font-weight: 500; color: #1A1917;">Supplies</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9C978E" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="2.2"></circle><path d="M7.6 7.6a6.2 6.2 0 0 0 0 8.8M16.4 16.4a6.2 6.2 0 0 0 0-8.8"></path></svg>
+      <div style="font-size: 11px; color: #9C978E;">Network</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

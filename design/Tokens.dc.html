@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; }
+    a { color: #16324F; } a:hover { color: #0E2338; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="width: 560px; height: 844px; background: #FAF9F7; color: #1A1917; display: flex; flex-direction: column; padding: 32px; gap: 26px; overflow: hidden;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1.1;">Design tokens</div>
+    <div style="font-size: 14px; color: #9C978E;">Instrument Serif for titles, Instrument Sans for everything else</div>
+  </div>
+
+  <!-- Rules -->
+  <div style="display: flex; flex-direction: column; gap: 9px; padding: 18px 20px; background: #FFFFFF; border: 1px solid #E6E3DE; border-radius: 16px;">
+    <div style="font-size: 15px; font-weight: 500;">Three rules</div>
+    <div style="font-size: 14px; color: #6B6862; line-height: 1.6;">1. Colour means urgency. Nothing else in the app is coloured.<br>2. No badge, chip or pill unless a number has to sit beside a word.<br>3. Body text never below 14 px. Rows, not cards.</div>
+  </div>
+
+  <!-- Urgency -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 500;">Urgency</div>
+    <div style="display: flex; gap: 10px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 56px; border-radius: 12px; background: #D0342C;"></div>
+        <div style="font-size: 14px;">Now</div>
+        <div style="font-size: 13px; color: #9C978E;">#D0342C</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 56px; border-radius: 12px; background: #C2820E;"></div>
+        <div style="font-size: 14px;">Soon</div>
+        <div style="font-size: 13px; color: #9C978E;">#C2820E</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 56px; border-radius: 12px; background: #2E7D4F;"></div>
+        <div style="font-size: 14px;">Can wait</div>
+        <div style="font-size: 13px; color: #9C978E;">#2E7D4F</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 56px; border-radius: 12px; background: #33312D;"></div>
+        <div style="font-size: 14px;">Deceased</div>
+        <div style="font-size: 13px; color: #9C978E;">#33312D</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Neutrals -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 500;">Surface</div>
+    <div style="display: flex; gap: 10px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #FAF9F7; border: 1px solid #E6E3DE;"></div>
+        <div style="font-size: 13px; color: #6B6862;">paper</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E6E3DE;"></div>
+        <div style="font-size: 13px; color: #6B6862;">raised</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #E6E3DE;"></div>
+        <div style="font-size: 13px; color: #6B6862;">line</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #9C978E;"></div>
+        <div style="font-size: 13px; color: #6B6862;">faint</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #6B6862;"></div>
+        <div style="font-size: 13px; color: #6B6862;">soft</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #1A1917;"></div>
+        <div style="font-size: 13px; color: #6B6862;">ink</div>
+      </div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 48px; border-radius: 12px; background: #16324F;"></div>
+        <div style="font-size: 13px; color: #6B6862;">action</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Type -->
+  <div style="display: flex; flex-direction: column; gap: 13px;">
+    <div style="font-size: 15px; font-weight: 500;">Type</div>
+    <div style="display: flex; align-items: baseline; gap: 16px;">
+      <div style="font-size: 13px; color: #9C978E; width: 92px;">Title / 26</div>
+      <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px;">Incidents</div>
+    </div>
+    <div style="display: flex; align-items: baseline; gap: 16px;">
+      <div style="font-size: 13px; color: #9C978E; width: 92px;">Row / 16</div>
+      <div style="font-size: 16px; font-weight: 500;">Trapped under debris</div>
+    </div>
+    <div style="display: flex; align-items: baseline; gap: 16px;">
+      <div style="font-size: 13px; color: #9C978E; width: 92px;">Detail / 14</div>
+      <div style="font-size: 14px; color: #6B6862;">6 people &middot; 340 m away &middot; 4 min ago</div>
+    </div>
+    <div style="display: flex; align-items: baseline; gap: 16px;">
+      <div style="font-size: 13px; color: #9C978E; width: 92px;">Quiet / 13</div>
+      <div style="font-size: 13px; color: #9C978E;">Resolved &middot; school gym opened</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 500;">Buttons &middot; 52&ndash;60 px tall</div>
+    <div style="display: flex; gap: 10px;">
+      <div style="flex-grow: 1; height: 56px; border-radius: 15px; background: #D0342C; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; color: #FFFFFF;">Send</div>
+      <div style="flex-grow: 1; height: 56px; border-radius: 15px; background: #16324F; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; color: #FFFFFF;">Send a team</div>
+      <div style="flex-grow: 1; height: 56px; border-radius: 15px; background: #FFFFFF; border: 1px solid #E6E3DE; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; color: #1A1917;">Resolve</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":560,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

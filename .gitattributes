@@ -1,7 +1,4 @@
 # GitHub Linguist Overrides
-# Ignore design sketch HTML and static landing pages from repository language statistics
+# Treat static landing page as documentation so language stats reflect real application code
 
-design/* linguist-documentation
-design/** linguist-documentation
-*.html linguist-documentation
-*.dc.html linguist-documentation
+index.html linguist-documentation

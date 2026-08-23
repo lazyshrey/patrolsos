@@ -159,7 +159,7 @@ Every packet is a compact **20-byte binary frame** (big-endian) that fits inside
 npm install
 npm test
 ```
-*(All 13 test suites and 118 unit tests run in pure TypeScript/Jest with zero device requirements).*
+*(All 13 test suites and 119 unit tests run in pure TypeScript/Jest with zero device requirements).*
 
 ### 2. Build Release APK
 ```bash

@@ -1,9 +1,11 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { C, s } from '../theme';
+import { Glyph } from '../icons';
 import { callsign } from '../../services/nodeIdentity';
 import { haversineMeters } from '../../core/geo';
 import { describeProximity } from '../../core/localization';
+import { BUZZ_ALL, DEFAULT_RING_SECONDS } from '../../core/buzz';
 import type { MeshState } from '../../state/useMesh';
 
 function ago(ms: number): string {
@@ -12,11 +14,43 @@ function ago(ms: number): string {
   return `${Math.floor(sec / 60)} min ago`;
 }
 
+/**
+ * Ringing a stranger's phone at full alarm volume is not a neutral act, and it
+ * is irreversible from here — there is no unring. One tap of confirmation is
+ * the right amount of friction: enough that nobody does it in a pocket, little
+ * enough that nobody dies waiting for a dialog.
+ */
+function confirmRing(mesh: MeshState, targetNodeId: number, label: string) {
+  Alert.alert(
+    targetNodeId === BUZZ_ALL ? 'Ring every phone nearby?' : `Ring ${label}?`,
+    targetNodeId === BUZZ_ALL
+      ? `Every phone in range, and every phone theirs can reach, will sound a full-volume alarm for ${DEFAULT_RING_SECONDS} seconds and answer with where it is. Use this to find people who cannot answer.`
+      : `Their phone will sound a full-volume alarm for ${DEFAULT_RING_SECONDS} seconds, through silent mode, and answer with where it is.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Ring',
+        style: 'destructive',
+        onPress: () => {
+          if (!mesh.buzz(targetNodeId)) {
+            Alert.alert('The mesh is off', 'Start it from Checks before ringing anyone.');
+          }
+        },
+      },
+    ]
+  );
+}
+
 export function NetworkScreen({ mesh }: { mesh: MeshState }) {
   const direct = mesh.peers.filter((p) => p.hops === 0).length;
   const relayed = mesh.peers.length - direct;
 
   const locationOff = mesh.bleStatus && !mesh.bleStatus.locationEnabled;
+
+  // Answers go stale on their own — a phone stops answering when its alarm
+  // ends — so "ringing now" is derived from freshness rather than remembered.
+  const now = Date.now();
+  const ringing = mesh.answers.filter((a) => now - a.at < 20_000);
 
   return (
     <ScrollView contentContainerStyle={s.body}>
@@ -72,6 +106,68 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
         </View>
       )}
 
+      <View style={[s.panel, { gap: 12 }]}>
+        <View style={s.row}>
+          <Glyph name="bell" color={C.ink} size={20} />
+          <Text style={[s.sectionLabel, { flex: 1 }]}>Find someone you cannot see</Text>
+        </View>
+        <Text style={s.quiet}>
+          Ringing makes a phone sound a full-volume alarm, through silent mode, and answer with
+          where it is. It works on a phone in a pocket with the screen off, and on one whose
+          owner cannot reach it.
+        </Text>
+        <Pressable
+          style={[
+            s.primary,
+            { height: 54, backgroundColor: mesh.running ? C.now : C.hairline },
+          ]}
+          onPress={() => confirmRing(mesh, BUZZ_ALL, 'everyone')}
+          disabled={!mesh.running}
+        >
+          <Text style={s.primaryText}>Ring every phone nearby</Text>
+        </Pressable>
+        {!mesh.running && (
+          <Text style={s.quiet}>The mesh is off — start it from Checks first.</Text>
+        )}
+      </View>
+
+      {ringing.length > 0 && (
+        <View style={[s.panel, { borderColor: C.now, borderWidth: 2 }]}>
+          <Text style={{ fontSize: 17, fontWeight: '600', color: C.ink }}>
+            {ringing.length} phone{ringing.length === 1 ? ' is' : 's are'} ringing now
+          </Text>
+          <Text style={s.quiet}>
+            Listen for the alarm and walk towards it. These positions refresh every few seconds
+            while the phone keeps sounding.
+          </Text>
+          {ringing.map((a) => {
+            const d =
+              mesh.fix && a.lat != null && a.lon != null
+                ? haversineMeters(mesh.fix, { lat: a.lat, lon: a.lon })
+                : null;
+            return (
+              <View key={a.responderNodeId} style={{ gap: 3, paddingTop: 8 }}>
+                <Text style={s.rowText}>{callsign(a.responderNodeId)}</Text>
+                <Text style={s.quiet}>
+                  {d != null
+                    ? `about ${Math.round(d / 10) * 10} m away`
+                    : a.lat != null
+                      ? 'position known, but this phone has no fix to compare it to'
+                      : 'no satellite fix — see the estimate below'}
+                  {a.hops > 0 ? ` · ${a.hops} hop${a.hops === 1 ? '' : 's'} away` : ' · direct'}
+                  {a.battery != null ? ` · battery ${a.battery}%` : ''}
+                </Text>
+                {a.lat != null && a.lon != null && (
+                  <Text style={s.code}>
+                    {a.lat.toFixed(5)}, {a.lon.toFixed(5)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       <View style={{ gap: 0 }}>
         <Text style={[s.sectionLabel, { paddingBottom: 8 }]}>Nearby</Text>
         {mesh.peers.length === 0 && (
@@ -86,6 +182,7 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
               : null;
           const prox = describeProximity({ hops: p.hops, rssi: p.rssi, gpsDistanceM: gps });
           const low = p.battery != null && p.battery <= 20;
+          const rings = p.ringingUntil != null && p.ringingUntil > now;
           return (
             <View key={p.nodeId} style={s.listRow}>
               <View style={{ flex: 1, gap: 3 }}>
@@ -101,6 +198,31 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
                 )}
               </View>
               <Bars rssi={p.rssi} hops={p.hops} />
+              <Pressable
+                onPress={() => confirmRing(mesh, p.nodeId, callsign(p.nodeId))}
+                disabled={!mesh.running}
+                hitSlop={8}
+                style={{
+                  height: 40,
+                  paddingHorizontal: 14,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: rings ? C.now : C.line,
+                  backgroundColor: rings ? '#FFF4F3' : C.card,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: mesh.running ? (rings ? C.now : C.action) : C.faint,
+                  }}
+                >
+                  {rings ? 'Ringing' : 'Ring'}
+                </Text>
+              </Pressable>
             </View>
           );
         })}

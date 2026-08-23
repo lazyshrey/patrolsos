@@ -1,0 +1,28 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    Declared here rather than in app.json so the service and the permissions it
+    needs travel together. The manifest merger folds them into the app.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!--
+    Doze stops the CPU, and a stopped CPU is a phone that has left the mesh.
+    Everything PATROL does happens while the screen is off and the phone is in
+    a pocket, so this is the app's core function being affected by Doze rather
+    than a background-work convenience.
+  -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+  <application>
+    <service
+      android:name=".PatrolForegroundService"
+      android:exported="false"
+      android:stopWithTask="false"
+      android:foregroundServiceType="connectedDevice|location" />
+  </application>
+</manifest>

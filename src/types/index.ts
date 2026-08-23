@@ -36,6 +36,24 @@ export const Category = {
    * descPreset carries the RSSI magnitude.
    */
   OBSERVATION: 9,
+  /**
+   * "Ring." A locate ping: every phone it names starts a loud alarm and
+   * answers with where it is.
+   *
+   * Same 20-byte frame: lat/lon are the CALLER's position, originNodeId is the
+   * caller, casualties carries the target node id (BUZZ_ALL = everyone) and
+   * descPreset carries how many seconds to ring for. The caller's lamport is
+   * the press id, so hearing the same press ten times still rings once.
+   */
+  BUZZ: 10,
+  /**
+   * "I am ringing, and this is where I am." The answer to a BUZZ.
+   *
+   * lat/lon are the RESPONDER's own position, originNodeId is the responder,
+   * casualties carries the node id that rang them and descPreset carries their
+   * battery percentage.
+   */
+  BUZZ_ACK: 11,
   RESOURCE_OFFER: 12,
   DISPATCH: 13,
   GOSSIP_DIGEST: 14,
@@ -139,6 +157,8 @@ export interface PeerState {
    * Guards against a slow relayed copy dragging their position backwards.
    */
   presenceLamport?: number;
+  /** Set while this peer is answering a buzz, i.e. its alarm is sounding. */
+  ringingUntil?: number;
 }
 
 export type PacketDirection = 'rx' | 'tx' | 'drop' | 'merge';

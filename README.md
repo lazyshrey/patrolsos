@@ -62,6 +62,16 @@ Phones communicate directly with each other via **connectionless Bluetooth Low E
         <p>Dispatch updates ("Help on the way") travel backward across the mesh to notify the original reporter.</p>
       </td>
     </tr>
+    <tr>
+      <td width="300" valign="top" style="border: 1px solid #333; border-radius: 12px; background: rgba(255,255,255,0.03);">
+        <h3>🔔 Buzz to Locate</h3>
+        <p>Ring a phone you cannot see. It sounds a full-volume alarm through silent mode and answers with its position every few seconds.</p>
+      </td>
+      <td width="300" valign="top" style="border: 1px solid #333; border-radius: 12px; background: rgba(255,255,255,0.03);">
+        <h3>🌙 Runs in the Background</h3>
+        <p>A foreground service and wake lock keep the node relaying, and reachable by a buzz, with the screen off and the app closed.</p>
+      </td>
+    </tr>
   </table>
 </div>
 
@@ -78,6 +88,43 @@ Phones communicate directly with each other via **connectionless Bluetooth Low E
 
 ---
 
+## Buzz - Ringing a Phone You Cannot See
+
+RSSI trilateration narrows a silent phone to a circle tens of metres across. That is enough to pick the right building and not enough to pick the right room, let alone the right void under a slab. **Buzz closes the last few metres with sound.**
+
+Press **Ring** on a peer, or **Ring every phone nearby**, and the target phone:
+
+1. **Sounds a full-volume alarm** on Android's `STREAM_ALARM`, so it plays through silent mode and Do Not Disturb, plus a distinct vibration waveform that carries through a slab when air does not.
+2. **Answers with its position** every 5 seconds for the length of the alarm, taking a one-shot high-accuracy GPS fix at the moment it is rung.
+3. **Gets triangulated by everyone else**: every phone that hears the buzz go past files fresh RSSI observations of the phone about to ring, so the search circle tightens at the same moment the noise starts.
+
+The searcher sees a live *"N phones are ringing now"* panel with refreshing distances. The person being rung gets a full-screen alert explaining what is happening, with a single **Silence - I am safe and found** button.
+
+**The design constraints that make it safe:**
+
+- **Presses, not packets.** A buzz is named `originNodeId:lamport`. In steady state one press is heard dozens of times through relays; keying the alarm on the press means it rings **once**, and a silenced alarm stays silenced.
+- **Rate limited.** One caller cannot re-ring the same phone inside 20 seconds, however hard they hammer the button.
+- **Self-expiring.** A buzz carries its own duration (5-180 s, default 30) and leaves the broadcast rotation when the alarm ends, so nobody keeps announcing an emergency that is over.
+- **Confirmed.** Ringing a stranger's phone at alarm volume is irreversible from the caller's side, so it takes one tap of confirmation.
+- **Prioritised.** A buzz outranks every other packet in the rotation, in both directions. It is the only packet in the protocol with a deadline measured in seconds.
+
+Two categories carry it, reusing the same 20-byte frame: `BUZZ (10)`, where `casualties` is the target node id (`255` = everyone) and `descPreset` is the ring duration; and `BUZZ_ACK (11)`, where `lat`/`lon` are the responder's own position and `descPreset` is their battery.
+
+---
+
+## Running in the Background
+
+Android freezes a backgrounded app within minutes: BLE scanning is throttled to nothing and the JS timers driving the broadcast rotation simply stop. The phone looks like a running node and is in fact a brick with a green dot - which is the exact failure this app cannot have, because a phone in a pocket with the screen off *is* the normal case.
+
+`modules/patrol-service` holds the two things that fix it:
+
+- **A foreground service**, which keeps the process off the kill list. The price is a permanent notification, and that is the right price - a phone quietly running its radio flat should say so. It shows the live peer count, tapping it opens the app, and it carries a **Stop** button that shuts the radio down cleanly.
+- **A `PARTIAL_WAKE_LOCK`**, which keeps the CPU running with the screen off. Without it Doze suspends the JS thread within minutes.
+
+The service declares `foregroundServiceType="connectedDevice|location"` but only claims the `location` half when fine location has actually been granted - claiming a type without its permission is what makes Android 14 throw at `startForeground`. **Checks** reports service state, notification permission and Doze exemption, with a one-tap prompt for the last.
+
+---
+
 ## Wire Packet (`PATROL/1`)
 
 Every packet is a compact **20-byte binary frame** (big-endian) that fits inside a single standard BLE advertisement:
@@ -86,7 +133,7 @@ Every packet is a compact **20-byte binary frame** (big-endian) that fits inside
 | :---: | :---: | :--- | :--- |
 | `0` | 4 B | `packetId` | Content-addressed SHA-256 slice (coordinates, category, origin, 15m time bucket) |
 | `4` | 8 B | `lat`, `lon` | Fixed-point coordinates ($10^{-6}$ deg, ~11 cm precision) |
-| `12` | 1 B | `category : triage` | Packed nibbles: Category (0–14) & S.T.A.R.T. triage (0–4) |
+| `12` | 1 B | `category : triage` | Packed nibbles: Category (0-14, incl. `10 BUZZ` / `11 BUZZ_ACK`) & S.T.A.R.T. triage (0-4) |
 | `13` | 1 B | `casualties` | Casualty count ($255 =$ many) |
 | `14` | 1 B | `ttl : hops` | Packed nibbles: TTL (starts at 7) & Hops (caps at 15) |
 | `15` | 2 B | `lamport` | Logical clock for Last-Writer-Wins field updates |
@@ -100,8 +147,8 @@ Every packet is a compact **20-byte binary frame** (big-endian) that fits inside
 
 - **Request**: 3-tap panic reporting with S.T.A.R.T. triage and automatic satellite GPS tagging.
 - **Incidents**: Real-time triage feed with merged clusters and reverse status dispatching.
-- **Network**: Live mesh telemetry, peer hop distances, and outbox delivery receipts.
-- **Checks**: Preflight diagnostic indicators for BLE advertising, scanning, permissions, and location services.
+- **Network**: Live mesh telemetry, peer hop distances, outbox delivery receipts, and the **Ring** controls for buzzing a peer or everyone in range.
+- **Checks**: Preflight diagnostics for BLE advertising, scanning, permissions, location services and the background service.
 
 ---
 
@@ -112,7 +159,7 @@ Every packet is a compact **20-byte binary frame** (big-endian) that fits inside
 npm install
 npm test
 ```
-*(All 12 test suites and 104 unit tests run in pure TypeScript/Jest with zero device requirements).*
+*(All 13 test suites and 118 unit tests run in pure TypeScript/Jest with zero device requirements).*
 
 ### 2. Build Release APK
 ```bash
@@ -136,6 +183,8 @@ See [TESTING.md](TESTING.md) for full physical mesh testing protocols:
 2. **Multi-Hop Relay**: Place Phone B between Phone A and Phone C (with A and C out of direct range). Reports sent from A arrive at C showing **`2 hops`**.
 3. **Status Flow Back**: Acknowledge on Phone C — Phone A updates to **"On the way"** across the relay.
 4. **Offline Resilience**: Turn on Airplane mode on all devices (with Bluetooth on) — mesh runs 100% offline.
+5. **Buzz**: Lock Phone C, put it in a bag, and press **Ring** on it from Phone A. It should alarm at full volume through silent mode and appear under *"phones are ringing now"* with a refreshing distance.
+6. **Background Survival**: Close the app on Phone B (do not force-stop it) and confirm the ongoing notification stays up and Phone A still relays through it.
 
 ---
 

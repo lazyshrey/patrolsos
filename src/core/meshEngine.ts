@@ -33,6 +33,19 @@ import {
   type LocationEstimate,
   type Observation,
 } from './localization';
+import {
+  BUZZ_ALL,
+  BUZZ_STALE_MS,
+  BUZZ_TTL,
+  BuzzGate,
+  DEFAULT_RING_SECONDS,
+  answerFromPacket,
+  buzzFromPacket,
+  clampRingSeconds,
+  pressKey,
+  type BuzzAnswer,
+  type BuzzRequest,
+} from './buzz';
 
 const SEEN_CAP = 2000;
 const ROTATION_CAP = 24;
@@ -52,6 +65,20 @@ const OBSERVATION_TTL = 4;
 
 /** Stop trusting an observation after this long — people move. */
 const OBSERVATION_STALE_MS = 5 * 60 * 1000;
+
+/**
+ * How long a peer stays marked "ringing" on the strength of one answer.
+ *
+ * A phone whose alarm is sounding re-answers every few seconds, so this only
+ * has to outlast the gap between answers — not the whole alarm.
+ */
+const RINGING_MS = 15_000;
+
+/** An answer is worth re-broadcasting for about as long as it is true. */
+const ANSWER_AIRTIME_MS = 30_000;
+
+/** Slack on top of the ring duration, so late joiners still hear the call. */
+const BUZZ_AIRTIME_SLACK_MS = 15_000;
 
 /**
  * RSSI is negative and roughly -30..-110 dBm. Store the magnitude so it fits a
@@ -81,6 +108,13 @@ export interface MeshEngineOptions {
   /** Injected so tests control time. */
   now?: () => number;
   onChange?: () => void;
+  /**
+   * Fires once per genuine press of somebody's buzz button — echoes and relayed
+   * copies of the same press are swallowed. Check `forMe` before making noise;
+   * a buzz aimed at someone else is still worth knowing about, because it means
+   * a phone near you is about to start ringing.
+   */
+  onBuzz?: (buzz: BuzzRequest) => void;
 }
 
 export interface OriginateInput {
@@ -99,13 +133,24 @@ export class MeshEngine {
   private sha256: Sha256Fn;
   private now: () => number;
   private onChange?: () => void;
+  private onBuzzCb?: (buzz: BuzzRequest) => void;
 
   private incidents = new Map<number, Incident>();
   private seen = new Set<string>();
   private seenOrder: string[] = [];
   private peers = new Map<number, PeerState>();
   private observations = new Map<string, Observation>();
+  private buzzes = new Map<string, BuzzRequest>();
+  private answers = new Map<number, BuzzAnswer>();
+  private buzzGate: BuzzGate;
   private log: PacketEvent[] = [];
+
+  /**
+   * Packets that stop being true after a while. A buzz is a moment, not a
+   * fact: keeping one in the rotation once its alarm has finished would spend
+   * radio time announcing an emergency that is over.
+   */
+  private ephemeral = new Map<number, number>();
 
   private lamport = 0;
   private rotation: Packet[] = [];
@@ -123,7 +168,9 @@ export class MeshEngine {
     this.sha256 = opts.sha256;
     this.now = opts.now ?? (() => Date.now());
     this.onChange = opts.onChange;
+    this.onBuzzCb = opts.onBuzz;
     this.outbox = new Outbox(this.now);
+    this.buzzGate = new BuzzGate(this.now);
   }
 
   // -------------------------------------------------------------------------
@@ -272,6 +319,94 @@ export class MeshEngine {
     return fresh.length;
   }
 
+  /**
+   * Ring a phone — or every phone in earshot — and ask it to say where it is.
+   *
+   * `lat`/`lon` are OUR position, so whoever starts ringing knows which
+   * direction the call came from. Pass 0,0 when there is no fix; the buzz still
+   * works, it just cannot say where the caller stood.
+   */
+  sendBuzz(
+    targetNodeId: number = BUZZ_ALL,
+    lat = 0,
+    lon = 0,
+    seconds: number = DEFAULT_RING_SECONDS
+  ): Packet {
+    const at = this.now();
+    // The press id. Bumping the clock first is what makes two presses
+    // distinguishable to everyone downstream.
+    this.lamport = nextLamport(this.lamport, this.lamport);
+
+    const packet: Packet = {
+      packetId: computePacketId(this.sha256, lat, lon, Category.BUZZ, this.nodeId, at),
+      lat,
+      lon,
+      category: Category.BUZZ,
+      triage: 4 as Triage,
+      casualties: targetNodeId & 0xff,
+      ttl: BUZZ_TTL,
+      hops: 0,
+      lamport: this.lamport,
+      status: 0 as Status,
+      descPreset: clampRingSeconds(seconds),
+      originNodeId: this.nodeId,
+    };
+
+    // Consume our own press so an echo of it can never ring us back.
+    this.buzzGate.admit(buzzFromPacket(packet, this.nodeId, at));
+    this.markSeen(this.seenKey(packet));
+    this.enqueue(packet);
+    this.ephemeral.set(
+      packet.packetId,
+      at + clampRingSeconds(seconds) * 1000 + BUZZ_AIRTIME_SLACK_MS
+    );
+    this.pushLog(
+      'tx',
+      packet.packetId,
+      targetNodeId === BUZZ_ALL
+        ? `buzz all · ${packet.descPreset}s`
+        : `buzz node ${targetNodeId} · ${packet.descPreset}s`
+    );
+    this.rebuildRotation();
+    this.emit();
+    return packet;
+  }
+
+  /**
+   * "I am ringing, and this is where I am." Sent by the phone being rung.
+   *
+   * Called repeatedly while the alarm sounds rather than once: each answer is a
+   * fresh position, and the searcher walking towards the noise is exactly the
+   * person who benefits from an updated one.
+   */
+  answerBuzz(callerNodeId: number, lat = 0, lon = 0, batteryPercent = 255): Packet {
+    const at = this.now();
+    this.lamport = nextLamport(this.lamport, this.lamport);
+
+    const packet: Packet = {
+      packetId: computePacketId(this.sha256, lat, lon, Category.BUZZ_ACK, this.nodeId, at),
+      lat,
+      lon,
+      category: Category.BUZZ_ACK,
+      triage: 4 as Triage,
+      casualties: callerNodeId & 0xff,
+      ttl: BUZZ_TTL,
+      hops: 0,
+      lamport: this.lamport,
+      status: 0 as Status,
+      descPreset: Math.min(255, Math.max(0, Math.round(batteryPercent))),
+      originNodeId: this.nodeId,
+    };
+
+    this.markSeen(this.seenKey(packet));
+    this.enqueue(packet);
+    this.ephemeral.set(packet.packetId, at + ANSWER_AIRTIME_MS);
+    this.pushLog('tx', packet.packetId, `answering buzz from ${callerNodeId}`);
+    this.rebuildRotation();
+    this.emit();
+    return packet;
+  }
+
   /** Advance an incident's status and gossip the change back out. */
   setStatus(packetId: number, status: Status): Packet | null {
     const inc = this.incidents.get(packetId);
@@ -356,11 +491,21 @@ export class MeshEngine {
     this.stats.heard++;
     this.pushLog('rx', packet.packetId, `ttl ${packet.ttl} hops ${packet.hops}`);
 
-    // Presence and observations are peer metadata, not incidents.
-    if (packet.category === Category.OBSERVATION) {
-      this.recordObservation(packet, at);
-    } else if (packet.category !== Category.PRESENCE) {
-      this.ingest(packet, at, false);
+    // Presence, observations and buzzes are peer metadata, not incidents.
+    switch (packet.category) {
+      case Category.OBSERVATION:
+        this.recordObservation(packet, at);
+        break;
+      case Category.BUZZ:
+        this.recordBuzz(packet, at);
+        break;
+      case Category.BUZZ_ACK:
+        this.recordAnswer(packet, at);
+        break;
+      case Category.PRESENCE:
+        break;
+      default:
+        this.ingest(packet, at, false);
     }
 
     // Relay with a decremented hop budget.
@@ -371,6 +516,17 @@ export class MeshEngine {
         hops: Math.min(packet.hops + 1, MAX_HOPS),
       };
       this.enqueue(relayed);
+      // A relayed ring needs the same deadline as an originated one, or we
+      // would keep announcing an alarm that finished ten minutes ago.
+      if (isRingPacket(relayed)) {
+        this.ephemeral.set(
+          relayed.packetId,
+          at +
+            (relayed.category === Category.BUZZ
+              ? clampRingSeconds(relayed.descPreset) * 1000 + BUZZ_AIRTIME_SLACK_MS
+              : ANSWER_AIRTIME_MS)
+        );
+      }
       this.stats.relayed++;
       this.pushLog('tx', packet.packetId, `relay ttl ${relayed.ttl}`);
     }
@@ -417,6 +573,48 @@ export class MeshEngine {
     });
   }
 
+  /**
+   * File a heard buzz and, if this is the first time we have seen this press,
+   * tell the app about it.
+   *
+   * Note the ordering: the buzz is stored for the UI whatever the gate decides,
+   * because "node 47 is ringing everyone nearby" is worth showing even on a
+   * phone that is rate-limited out of joining in.
+   */
+  private recordBuzz(packet: Packet, at: number): void {
+    const buzz = buzzFromPacket(packet, this.nodeId, at);
+    if (buzz.callerNodeId === this.nodeId) return; // our own, come back around
+
+    const key = pressKey(buzz.callerNodeId, buzz.press);
+    const known = this.buzzes.get(key);
+    // Keep the shortest path we have heard this press by — it is the honest
+    // one, and later copies arrive by longer routes.
+    if (!known || buzz.hops < known.hops) this.buzzes.set(key, buzz);
+
+    const admitted = this.buzzGate.admit(buzz);
+    this.pushLog(
+      'rx',
+      packet.packetId,
+      admitted
+        ? `buzz from ${buzz.callerNodeId} — ringing ${buzz.seconds}s`
+        : `buzz from ${buzz.callerNodeId}${buzz.forMe ? ' (held back)' : ' (not for us)'}`
+    );
+
+    // Fired for every new press, ours to ring for or not: a phone that hears
+    // someone else being rung should look around and report what it hears, so
+    // the caller can place the phone that is about to start screaming.
+    if (!known) this.onBuzzCb?.({ ...buzz, forMe: admitted });
+  }
+
+  /** File somebody's answer to a buzz. Keyed on responder — newest wins. */
+  private recordAnswer(packet: Packet, at: number): void {
+    const answer = answerFromPacket(packet, at);
+    if (answer.responderNodeId === this.nodeId) return;
+    const prev = this.answers.get(answer.responderNodeId);
+    if (prev && prev.at > answer.at) return;
+    this.answers.set(answer.responderNodeId, answer);
+  }
+
   /** Ours, and no peer has echoed it back yet. */
   private isUnsent(p: Packet): boolean {
     if (p.originNodeId !== this.nodeId) return false;
@@ -437,7 +635,13 @@ export class MeshEngine {
       (packet.category === Category.OBSERVATION &&
         p.category === Category.OBSERVATION &&
         p.originNodeId === packet.originNodeId &&
-        p.casualties === packet.casualties);
+        p.casualties === packet.casualties) ||
+      // A caller only ever has one live buzz, and a phone only one live answer.
+      // Without this, holding the button down would fill the rotation with
+      // presses and crowd out the incident reports.
+      ((packet.category === Category.BUZZ || packet.category === Category.BUZZ_ACK) &&
+        p.category === packet.category &&
+        p.originNodeId === packet.originNodeId);
 
     this.rotation = [packet, ...this.rotation.filter((p) => !stale(p))];
   }
@@ -447,12 +651,26 @@ export class MeshEngine {
    * most urgent packets in the pool when it overflows.
    */
   private rebuildRotation(): void {
+    const at = this.now();
     const byId = new Map<number, Packet>();
-    for (const p of this.rotation) byId.set(p.packetId, p);
+    for (const p of this.rotation) {
+      const expires = this.ephemeral.get(p.packetId);
+      if (expires != null && at >= expires) {
+        this.ephemeral.delete(p.packetId);
+        continue;
+      }
+      byId.set(p.packetId, p);
+    }
 
     const ranked = [...byId.values()].sort((a, b) => {
-      // Our own packets that nobody has echoed yet come first. They are the
-      // only ones we KNOW have not got out, so they need the radio most.
+      // A buzz outranks everything, in both directions. It is the only packet
+      // in the protocol with a deadline measured in seconds: an alarm that
+      // starts after the searcher has walked past is worse than no alarm.
+      const ring = Number(isRingPacket(b)) - Number(isRingPacket(a));
+      if (ring !== 0) return ring;
+
+      // Then our own packets that nobody has echoed yet. They are the only
+      // ones we KNOW have not got out, so they need the radio most.
       const unsent = Number(this.isUnsent(b)) - Number(this.isUnsent(a));
       if (unsent !== 0) return unsent;
 
@@ -496,6 +714,14 @@ export class MeshEngine {
     if (nodeId === this.nodeId) return;
     const prev = this.peers.get(nodeId);
     const isPresence = packet.category === Category.PRESENCE;
+    const isAnswer = packet.category === Category.BUZZ_ACK;
+    // Packets whose coordinates are the SENDER's own rather than an incident's.
+    // An answer to a buzz is the most valuable of the three: it is a position
+    // deliberately published by someone who has just been asked for it.
+    const selfLocating = isPresence || isAnswer || packet.category === Category.BUZZ;
+    // 0,0 is what a phone with no fix sends. Believing it would stack every
+    // unlocated peer on one spot in the Gulf of Guinea.
+    const statesPosition = selfLocating && !(packet.lat === 0 && packet.lon === 0);
 
     // Raw RSSI jumps 10+ dB between consecutive packets from a stationary
     // phone — body position, orientation and multipath all move it. An
@@ -510,8 +736,10 @@ export class MeshEngine {
     // one came direct. Accepting it would drag the peer's pin backwards to
     // where they used to be, so position only ever moves forward in logical
     // time.
-    const fresherPresence =
-      isPresence && (prev?.presenceLamport == null || packet.lamport >= prev.presenceLamport);
+    const fresherFromSender =
+      selfLocating &&
+      (prev?.presenceLamport == null || packet.lamport >= prev.presenceLamport);
+    const fresherPresence = fresherFromSender && statesPosition;
 
     // Route quality has to be able to degrade. Sticky "best ever" hops would
     // keep showing someone as directly reachable long after they walked out of
@@ -531,8 +759,12 @@ export class MeshEngine {
       lat: fresherPresence ? packet.lat : prev?.lat,
       lon: fresherPresence ? packet.lon : prev?.lon,
       presenceLamport: fresherPresence ? packet.lamport : prev?.presenceLamport,
-      battery:
-        fresherPresence && packet.casualties <= 100 ? packet.casualties : prev?.battery,
+      // Presence carries battery in the casualties byte; an answer carries it
+      // in descPreset, because its casualties byte names who it is answering.
+      battery: (fresherFromSender ? batteryFrom(packet) : undefined) ?? prev?.battery,
+      // An answer means "my alarm is going off right now". It is refreshed
+      // every few seconds for as long as that stays true.
+      ringingUntil: isAnswer ? at + RINGING_MS : prev?.ringingUntil,
     });
   }
 
@@ -547,6 +779,18 @@ export class MeshEngine {
     for (const [key, o] of this.observations) {
       if (at - o.at > OBSERVATION_STALE_MS) this.observations.delete(key);
     }
+
+    for (const [key, b] of this.buzzes) {
+      if (at - b.at > BUZZ_STALE_MS) this.buzzes.delete(key);
+    }
+    for (const [id, expires] of this.ephemeral) {
+      if (at >= expires) this.ephemeral.delete(id);
+    }
+    for (const [id, a] of this.answers) {
+      if (at - a.at > BUZZ_STALE_MS) this.answers.delete(id);
+    }
+    // Retires finished buzzes from the broadcast rotation.
+    this.rebuildRotation();
 
     this.outbox.sweep();
 
@@ -686,6 +930,16 @@ export class MeshEngine {
     return [...this.observations.values()];
   }
 
+  /** Every buzz press we have heard lately, newest first. */
+  getBuzzes(): BuzzRequest[] {
+    return [...this.buzzes.values()].sort((a, b) => b.at - a.at);
+  }
+
+  /** Who is currently ringing, and where they say they are. Newest first. */
+  getAnswers(): BuzzAnswer[] {
+    return [...this.answers.values()].sort((a, b) => b.at - a.at);
+  }
+
   /**
    * Estimated positions for every node we have observations of.
    *
@@ -714,6 +968,17 @@ export class MeshEngine {
   getRotationSize(): number {
     return this.rotation.length;
   }
+}
+
+function isRingPacket(p: Packet): boolean {
+  return p.category === Category.BUZZ || p.category === Category.BUZZ_ACK;
+}
+
+/** Battery percentage a packet states about its own sender, if any. */
+function batteryFrom(p: Packet): number | undefined {
+  if (p.category === Category.PRESENCE && p.casualties <= 100) return p.casualties;
+  if (p.category === Category.BUZZ_ACK && p.descPreset <= 100) return p.descPreset;
+  return undefined;
 }
 
 function triageRank(t: Triage): number {

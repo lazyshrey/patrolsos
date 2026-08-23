@@ -142,10 +142,69 @@ district to a building, nothing more.
 
 ---
 
-## 9. No infrastructure at all
+## 9. Ringing a phone you cannot see
+
+Two phones. This is the test the whole buzz feature exists for, so do it badly
+on purpose: put the target somewhere you genuinely cannot see it.
+
+1. On Phone B, turn the ringer to **silent**, lock the screen, and put it in a
+   bag, a drawer, or under cushions. Leave the mesh running.
+2. On Phone A, open **Network** and press **Ring** beside Phone B, then confirm.
+3. Within a few seconds Phone B should alarm at **full volume through silent
+   mode**, vibrate, and light up with a red full-screen alert.
+4. Phone A should show Phone B under **"1 phone is ringing now"**, with a
+   distance that refreshes every few seconds.
+5. Let it run out. The alarm stops by itself after 30 seconds, Phone B's alert
+   clears, and Phone B disappears from the ringing panel.
+6. Press **Ring** again immediately. Nothing should happen — one caller is rate
+   limited to one ring per phone per 20 seconds. Wait it out and try again.
+7. Press **Silence** on Phone B mid-alarm. It must stay silent; a relayed copy
+   of the same press arriving a second later must not restart it.
+
+With three phones, put B out of A's range and buzz through the relay: the alert
+on C should say the call came **through 1 phone**, and the answer should still
+find its way back to A.
+
+**Ring every phone nearby** does the same to everything in range at once. Do not
+test that one in a public place.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Vibrates but silent | No alarm tone set on the device | Set any alarm sound in Clock |
+| Nothing at all on the target | Mesh not running there | Start it in Checks |
+| Alert appears late | Target was mid scan-off leg | Normal; listening is 5 s in every 9 |
+| Second press ignored | 20 s caller cooldown | By design |
+
+---
+
+## 10. Surviving the background
+
+This is the difference between a demo and a tool.
+
+1. Start the mesh on Phone B. A permanent **PATROL is on** notification should
+   appear, showing the live peer count.
+2. Open **Checks → Running in the background**. Three lights: service running,
+   notification allowed, battery unrestricted. If the last is red, tap **Allow
+   PATROL to run unrestricted** and accept.
+3. Press **Home** on Phone B — do *not* swipe the app away, and do not force
+   stop it.
+4. Lock Phone B and leave it for **ten minutes**.
+5. From Phone A, send a report. Phone B should still relay it: check Phone C
+   receives it at 2 hops, or ring Phone B and confirm it still answers.
+6. Press **Stop** on Phone B's notification. The notification should vanish and
+   the app, when reopened, should show the mesh as off.
+
+Without the battery exemption, expect Phone B to go quiet somewhere between 15
+minutes and an hour depending on the OEM. That is Doze, not a bug in the mesh,
+and it is exactly what step 2 prevents.
+
+---
+
+## 11. No infrastructure at all
 
 Put every phone in **airplane mode**, then turn Bluetooth back on. Repeat
-Test 4. Behaviour should be identical. No cell, no Wi-Fi, no internet.
+Test 4, then Test 9. Behaviour should be identical. No cell, no Wi-Fi, no
+internet.
 
 ---
 
@@ -171,13 +230,21 @@ ignore all but the first.
 **Battery.** Listening runs 5 seconds in every 9. Advertising is continuous, so
 you stay discoverable at all times. Expect meaningfully longer life than
 flat-out scanning, but this is still a radio running constantly — keep phones
-charged for long tests.
+charged for long tests. Running in the background also holds a
+partial wake lock, so the CPU never sleeps while the mesh is on: that is the
+cost of not silently dropping out of the network, and it is charged whether the
+screen is on or off.
 
 ---
 
 ## Known limits
 
-- Packets are unsigned; anyone in range could inject a false report.
+- Packets are unsigned; anyone in range could inject a false report - or ring
+  your phone. Buzz is rate limited per caller and self-expiring, which bounds
+  the nuisance, but it does not authenticate anybody. Signed packets are a v2
+  problem and they do not fit in 20 bytes.
+- The buzz alarm forces the alarm stream to maximum for its duration and puts
+  the previous volume back afterwards. A crash mid-alarm would leave it loud.
 - Wi-Fi Direct is written but disabled — OEM group-formation behaviour is
   unverified.
 - No map yet. The data exists; the rendering does not.

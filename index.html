@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P.A.T.R.O.L. | Offline Peer-to-Peer Disaster Mesh Network</title>
+  <meta name="description" content="Peer-to-peer Aid, Tracking, & Remote Offline Link. Decentralized disaster coordination mesh for Android over connectionless BLE gossip. No cell, no Wi-Fi, no servers." />
+  <meta name="author" content="Shrey Jaiswal" />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- OpenGraph / Social -->
+  <meta property="og:title" content="P.A.T.R.O.L. | Disaster Coordination Mesh" />
+  <meta property="og:description" content="Zero-infrastructure disaster coordination for Android over connectionless BLE gossip." />
+  <meta property="og:url" content="https://github.com/lazyshrey/patrolsos" />
+  <meta property="og:image" content="assets/logo.png" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:creator" content="@lazy_shrey" />
+
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              red: '#D0342C',
+              orange: '#C2820E',
+              green: '#2E7D4F',
+              blue: '#0082FC',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background-color: #000000;
+      color: #FFFFFF;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Background Glows */
+    .ambient-glow {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(120px);
+      pointer-events: none;
+      opacity: 0.22;
+      z-index: 0;
+    }
+    .glow-top-left {
+      top: -10%;
+      left: -10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(208, 52, 44, 0.7) 0%, rgba(0, 130, 252, 0.3) 70%, transparent 100%);
+    }
+    .glow-bottom-right {
+      bottom: 10%;
+      right: -10%;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(0, 130, 252, 0.6) 0%, rgba(208, 52, 44, 0.2) 70%, transparent 100%);
+    }
+    .glow-center {
+      top: 40%;
+      left: 30%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(46, 125, 79, 0.3) 0%, transparent 70%);
+    }
+
+    /* Glassmorphism Classes matching Chroma */
+    .glass {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.025);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glass-card:hover {
+      background: rgba(255, 255, 255, 0.045);
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Subtle Phone Frame */
+    .phone-container {
+      position: relative;
+      border: 6px solid #1c1c1e;
+      border-radius: 42px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(255, 255, 255, 0.05);
+      background: #000;
+    }
+    .phone-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* Pulse Dot */
+    .live-dot {
+      animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+  </style>
+</head>
+<body class="font-sans antialiased selection:bg-red-500/30 selection:text-white">
+
+  <!-- Ambient Glow Backgrounds -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="ambient-glow glow-top-left"></div>
+    <div class="ambient-glow glow-bottom-right"></div>
+    <div class="ambient-glow glow-center"></div>
+  </div>
+
+  <!-- Floating Nav Pill (Chroma Style) -->
+  <nav class="fixed top-4 left-1/2 -translate-x-1/2 w-[92%] max-w-5xl z-50 glass py-3 px-5 sm:px-7 flex justify-between items-center transition-all duration-300 rounded-full shadow-2xl backdrop-blur-xl">
+    <a href="#" class="flex items-center gap-3 group">
+      <img src="assets/logo.png" alt="P.A.T.R.O.L. Logo" class="w-8 h-8 object-contain drop-shadow-lg group-hover:scale-105 transition-transform" />
+      <div class="flex items-center gap-2">
+        <span class="text-lg font-bold tracking-tight text-white drop-shadow-md">P.A.T.R.O.L.</span>
+      </div>
+    </a>
+
+    <div class="flex items-center gap-3">
+      <a href="https://discord.com/invite/ZVCB8EnRX2" target="_blank" rel="noreferrer" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/5">
+        <i data-lucide="message-circle" class="w-4 h-4"></i>
+        <span class="hidden md:inline">Discord</span>
+      </a>
+
+      <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/5">
+        <i data-lucide="github" class="w-4 h-4"></i>
+        <span class="hidden sm:inline">GitHub</span>
+      </a>
+
+      <a href="patrol-latest.apk" download class="inline-flex items-center justify-center text-xs sm:text-sm font-semibold transition-all h-9 px-4 sm:px-5 bg-white text-black hover:bg-gray-200 rounded-full shadow-lg gap-2 hover:scale-[1.02] active:scale-[0.98]">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span>Get APK</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main Content Wrapper -->
+  <main class="relative z-10 pt-28 sm:pt-36 pb-20 px-6 sm:px-10 max-w-6xl mx-auto flex flex-col gap-20 sm:gap-28">
+
+    <!-- Hero Section -->
+    <section class="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-10 min-h-[65vh]">
+      
+      <!-- Left Content -->
+      <div class="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left">
+
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1] mb-5 drop-shadow-xl">
+          Offline Disaster Mesh. <br class="hidden sm:block"/>
+          <span class="text-gray-400 font-semibold">When Everything Else Fails.</span>
+        </h1>
+
+        <p class="text-base sm:text-lg text-gray-400 max-w-xl mb-8 font-normal leading-relaxed">
+          <strong class="text-gray-200">P.A.T.R.O.L.</strong> is an emergency coordination network for the first 72 hours of a disaster. Phones pass panic reports, casualty counts, and triage statuses hop-by-hop over connectionless Bluetooth Low Energy — <span class="text-white">zero cell towers, zero Wi-Fi, zero servers.</span>
+        </p>
+
+        <!-- CTA Buttons Row -->
+        <div class="flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto">
+          <a href="patrol-latest.apk" download class="w-full sm:w-auto">
+            <button class="w-full sm:w-auto inline-flex items-center justify-center px-7 py-4 text-[15px] font-bold tracking-wide bg-white text-black hover:bg-gray-200 rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.15)] transition-all gap-2.5 hover:scale-[1.02] active:scale-[0.98]">
+              <i data-lucide="download" class="w-5 h-5 text-black"></i>
+              <span>Download APK for Android</span>
+              <span class="text-xs font-mono bg-black/10 px-2 py-0.5 rounded-md ml-1 text-black/70">v0.1.0</span>
+            </button>
+          </a>
+
+          <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="w-full sm:w-auto">
+            <button class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-4 text-[15px] font-medium tracking-wide border border-white/20 text-white hover:bg-white/10 rounded-2xl transition-all gap-2 hover:scale-[1.02] active:scale-[0.98]">
+              <i data-lucide="github" class="w-4 h-4 text-gray-300"></i>
+              <span>View on GitHub</span>
+            </button>
+          </a>
+        </div>
+
+        <!-- Micro Feature Guarantee -->
+        <div class="flex items-center gap-6 mt-8 text-xs text-gray-500 font-mono">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+            <span>MIT Licensed</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="radio" class="w-4 h-4 text-blue-400"></i>
+            <span>Connectionless BLE</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="cpu" class="w-4 h-4 text-amber-400"></i>
+            <span>CRDT Convergent</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Content: Real Application Showcase -->
+      <div class="flex-1 w-full flex justify-center lg:justify-end">
+        <div class="w-full max-w-[280px] sm:max-w-[320px] relative group">
+          
+          <!-- Ambient Card Backlight -->
+          <div class="absolute -inset-4 bg-gradient-to-tr from-red-500/20 via-blue-500/20 to-emerald-500/10 blur-2xl opacity-60 rounded-full pointer-events-none group-hover:opacity-90 transition-opacity duration-700"></div>
+
+          <!-- Phone Mockup Frame with Real Screenshot -->
+          <div class="phone-container relative z-10 transition-transform duration-500 group-hover:-translate-y-2">
+            <img src="assets/screenshot.png" alt="P.A.T.R.O.L. Emergency Request Screen" class="w-full h-auto object-cover block" />
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Tech Stack Strip (Chroma Style) -->
+    <section class="relative z-10 py-8 px-6 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-sm">
+      <div class="max-w-4xl mx-auto">
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">Engineered with Robust Offline Technologies</p>
+        <div class="flex flex-wrap justify-center items-center gap-x-8 gap-y-5 sm:gap-x-12 opacity-80 transition-all duration-300">
+          <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <i data-lucide="smartphone" class="w-4 h-4 text-emerald-400"></i> Android 10+
+          </span>
+          <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <i data-lucide="code-2" class="w-4 h-4 text-purple-400"></i> Kotlin Native
+          </span>
+          <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <i data-lucide="atom" class="w-4 h-4 text-cyan-400"></i> React Native 0.86
+          </span>
+          <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <i data-lucide="box" class="w-4 h-4 text-white"></i> Expo v57
+          </span>
+          <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <i data-lucide="file-code" class="w-4 h-4 text-blue-400"></i> TypeScript
+          </span>
+          <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <i data-lucide="database" class="w-4 h-4 text-amber-400"></i> SQLite
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Bento Grid -->
+    <section id="features" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+      
+      <div class="lg:col-span-3 mb-2">
+        <h2 class="text-3xl font-bold text-white mb-2 tracking-tight">System Architecture</h2>
+        <p class="text-gray-400 text-sm sm:text-base">Engineered from the ground up for extreme physical constraints and total zero-infrastructure autonomy.</p>
+      </div>
+
+      <!-- Card 1 -->
+      <div class="glass-card flex flex-col justify-between p-6 sm:p-7 rounded-2xl transition-all duration-300 group hover:-translate-y-1">
+        <div>
+          <div class="mb-5 bg-white/5 w-fit p-3 rounded-xl border border-white/10 text-blue-400 group-hover:scale-105 transition-transform">
+            <i data-lucide="radio" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-tight mb-2">Connectionless BLE Gossip</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Zero GATT connection handshakes, zero pairing popups, and no ~7 device limits. 20-byte raw frames broadcast 1-to-N to all nearby phones simultaneously.
+          </p>
+        </div>
+        <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
+          Advertised in Manufacturer Data (0xFFFF)
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="glass-card flex flex-col justify-between p-6 sm:p-7 rounded-2xl transition-all duration-300 group hover:-translate-y-1">
+        <div>
+          <div class="mb-5 bg-white/5 w-fit p-3 rounded-xl border border-white/10 text-emerald-400 group-hover:scale-105 transition-transform">
+            <i data-lucide="git-branch" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-tight mb-2">7-Hop Multi-Node Relay</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Epidemic controlled flooding. Hearing an unknown packet adds it to your device's broadcast rotation with decremented TTL, bridging isolated survivor pockets.
+          </p>
+        </div>
+        <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
+          Rotates top 24 urgent packets every 700ms
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="glass-card flex flex-col justify-between p-6 sm:p-7 rounded-2xl transition-all duration-300 group hover:-translate-y-1">
+        <div>
+          <div class="mb-5 bg-white/5 w-fit p-3 rounded-xl border border-white/10 text-amber-400 group-hover:scale-105 transition-transform">
+            <i data-lucide="locate-fixed" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-tight mb-2">GPS-Free RSSI Localization</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Locates victims trapped in basements or rubble without satellite fix. Surrounding GPS-fixed nodes broadcast signal observation packets to trilaterate search areas.
+          </p>
+        </div>
+        <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
+          Path-loss weighted centroid calculation
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="glass-card flex flex-col justify-between p-6 sm:p-7 rounded-2xl transition-all duration-300 group hover:-translate-y-1">
+        <div>
+          <div class="mb-5 bg-white/5 w-fit p-3 rounded-xl border border-white/10 text-purple-400 group-hover:scale-105 transition-transform">
+            <i data-lucide="check-check" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-tight mb-2">Monotonic Lattice CRDT</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Conflict-free state merges via mathematical supremum: <span class="font-mono text-xs text-gray-300">Reported < Ack < InProgress < Resolved</span>. Resolved incidents never regress.
+          </p>
+        </div>
+        <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
+          Lamport LWW with node ID tiebreaking
+        </div>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="glass-card flex flex-col justify-between p-6 sm:p-7 rounded-2xl transition-all duration-300 group hover:-translate-y-1">
+        <div>
+          <div class="mb-5 bg-white/5 w-fit p-3 rounded-xl border border-white/10 text-red-400 group-hover:scale-105 transition-transform">
+            <i data-lucide="zap" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-tight mb-2">3-Tap S.T.A.R.T. Triage</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Rapid, high-stress interface. Select category, urgency (Now / Soon / Can wait), casualty count, and send immediately with automatic satellite coordinates.
+          </p>
+        </div>
+        <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
+          Deduplicated via Geohash6 + Haversine
+        </div>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="glass-card flex flex-col justify-between p-6 sm:p-7 rounded-2xl transition-all duration-300 group hover:-translate-y-1">
+        <div>
+          <div class="mb-5 bg-white/5 w-fit p-3 rounded-xl border border-white/10 text-cyan-400 group-hover:scale-105 transition-transform">
+            <i data-lucide="repeat" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white tracking-tight mb-2">Echo Delivery Receipts</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            When peers relay your broadcast, they increment the hop counter. Hearing your own node ID on the radio with <span class="font-mono text-xs text-gray-300">hops > 0</span> gives proof of pickup with zero overhead.
+          </p>
+        </div>
+        <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
+          Zero-handshake verification receipt
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Wire Frame Technical Spec Section -->
+    <section class="glass p-7 sm:p-9 rounded-3xl relative z-10 border border-white/10">
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
+        <div>
+          <div class="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-blue-400 mb-2">
+            <i data-lucide="binary" class="w-4 h-4"></i>
+            <span>Compact Wire Protocol</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">The 20-Byte Binary Frame</h2>
+        </div>
+        <p class="text-gray-400 text-sm max-w-md">
+          Fits cleanly inside legacy 31-byte BLE advertising packets without fragmentation or MTU negotiation delays.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-center font-mono text-xs">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 0 (4B)</div>
+          <div class="font-semibold text-blue-400 mt-1">packetId</div>
+          <div class="text-gray-500 text-[10px]">SHA-256 slice</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 4 (4B)</div>
+          <div class="font-semibold text-cyan-400 mt-1">lat (i32)</div>
+          <div class="text-gray-500 text-[10px]">10⁻⁶ deg (~11cm)</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 8 (4B)</div>
+          <div class="font-semibold text-cyan-400 mt-1">lon (i32)</div>
+          <div class="text-gray-500 text-[10px]">10⁻⁶ deg (~11cm)</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 12 (1B)</div>
+          <div class="font-semibold text-emerald-400 mt-1">cat : triage</div>
+          <div class="text-gray-500 text-[10px]">Two nibbles</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 13 (1B)</div>
+          <div class="font-semibold text-amber-400 mt-1">casualties</div>
+          <div class="text-gray-500 text-[10px]">u8 (255=many)</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 14 (1B)</div>
+          <div class="font-semibold text-purple-400 mt-1">ttl : hops</div>
+          <div class="text-gray-500 text-[10px]">TTL 7 • Max 15</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 15 (2B)</div>
+          <div class="font-semibold text-indigo-400 mt-1">lamport</div>
+          <div class="text-gray-500 text-[10px]">u16 logical clock</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 17 (1B)</div>
+          <div class="font-semibold text-red-400 mt-1">status</div>
+          <div class="text-gray-500 text-[10px]">CRDT lattice</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <div class="text-gray-500 text-[10px] uppercase">Off 18 (1B)</div>
+          <div class="font-semibold text-yellow-400 mt-1">descPreset</div>
+          <div class="text-gray-500 text-[10px]">Canned phrases</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 col-span-2 sm:col-span-4 lg:col-span-1">
+          <div class="text-gray-500 text-[10px] uppercase">Off 19 (1B)</div>
+          <div class="font-semibold text-emerald-400 mt-1">originNodeId</div>
+          <div class="text-gray-500 text-[10px]">LWW tiebreaker</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Open Source, Community & Download Section (Chroma Style) -->
+    <section class="relative z-10 py-12 px-6 sm:px-10 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-sm">
+      <div class="max-w-4xl mx-auto flex flex-col items-center gap-8">
+        
+        <div class="text-center">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Open Source Disaster Infrastructure</p>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Join the Decentralized Mission</h2>
+        </div>
+
+        <div class="flex flex-wrap justify-center items-center gap-3.5">
+          <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
+            <i data-lucide="star" class="w-4 h-4 text-yellow-400"></i>
+            <span class="font-semibold">Star on GitHub</span>
+          </a>
+
+          <a href="https://github.com/lazyshrey/patrolsos/fork" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
+            <i data-lucide="git-fork" class="w-4 h-4"></i>
+            <span class="font-semibold">Fork</span>
+          </a>
+
+          <a href="https://github.com/lazyshrey/patrolsos/issues" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            <span class="font-semibold">Issues</span>
+          </a>
+
+          <a href="https://discord.com/invite/ZVCB8EnRX2" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-[#5865F2]/20 hover:bg-[#5865F2]/30 border-[#5865F2]/40 transition-all text-sm text-white">
+            <i data-lucide="message-circle" class="w-4 h-4 text-[#5865F2]"></i>
+            <span class="font-semibold">Join Discord</span>
+          </a>
+
+          <a href="patrol-latest.apk" download class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white text-black hover:bg-gray-200 transition-all text-sm font-semibold">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>patrol-v0.1.0.apk</span>
+          </a>
+        </div>
+
+        <!-- Support / Donate -->
+        <div class="flex flex-col items-center gap-3 mt-4">
+          <p class="text-sm text-gray-400">Support open-source disaster tech development</p>
+          <a href="https://payments.cashfree.com/forms/shrey" target="_blank" rel="noreferrer">
+            <button class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-white/10 hover:border-white/20 text-white font-medium text-sm transition-all hover:scale-105 backdrop-blur-sm shadow-lg">
+              <i data-lucide="heart" class="w-4 h-4 text-pink-400 fill-pink-400/30"></i>
+              <span>Buy Me a Coffee • Support via UPI</span>
+            </button>
+          </a>
+          <span class="text-xs text-gray-500 font-mono select-all">5aprilshrey@oksbi</span>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer (Chroma Style) -->
+  <footer class="relative z-10 glass border-t border-white/5 py-10 px-6 mt-12">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+      
+      <div class="flex items-center gap-3 opacity-75 hover:opacity-100 transition-opacity">
+        <img src="assets/logo.png" alt="P.A.T.R.O.L. Logo" class="w-5 h-5 grayscale" />
+        <a target="_blank" class="text-sm font-medium hover:text-white transition-colors" href="https://lazyshrey.com">
+          Built with ❤️ by Lazy Shrey
+        </a>
+      </div>
+
+      <div class="flex flex-wrap justify-center md:justify-end gap-x-6 gap-y-3 text-sm text-gray-500 font-medium">
+        <a target="_blank" class="hover:text-white transition-colors flex items-center gap-1.5" href="https://discord.com/invite/ZVCB8EnRX2">
+          <i data-lucide="message-circle" class="w-4 h-4"></i> Discord Support
+        </a>
+        <a target="_blank" class="hover:text-white transition-colors flex items-center gap-1.5" href="https://github.com/lazyshrey/patrolsos">
+          <i data-lucide="github" class="w-4 h-4"></i> Source Code
+        </a>
+        <a class="hover:text-white transition-colors" href="LICENSE">
+          MIT License
+        </a>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- Initialize Lucide Icons -->
+  <script>
+    lucide.createIcons();
+  </script>
+
+</body>
+</html>

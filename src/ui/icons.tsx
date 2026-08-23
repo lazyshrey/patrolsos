@@ -14,7 +14,7 @@ export function Glyph({
   color = C.faint,
   size = 20,
 }: {
-  name: 'plus' | 'list' | 'pin' | 'wave' | 'wrench';
+  name: 'plus' | 'list' | 'pin' | 'wave' | 'wrench' | 'bell';
   color?: string;
   size?: number;
 }) {
@@ -58,6 +58,38 @@ export function Glyph({
             height: t,
             borderRadius: t,
             backgroundColor: color,
+          }}
+        />
+      </View>
+    );
+  }
+
+  if (name === 'bell') {
+    return (
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-start' }}>
+        <View
+          style={{
+            width: size * 0.66,
+            height: size * 0.62,
+            borderTopLeftRadius: size * 0.33,
+            borderTopRightRadius: size * 0.33,
+            borderWidth: t,
+            borderBottomWidth: 0,
+            borderColor: color,
+            marginTop: size * 0.14,
+          }}
+        />
+        <View
+          style={{ width: size * 0.92, height: t, backgroundColor: color, borderRadius: t }}
+        />
+        <View
+          style={{
+            width: size * 0.22,
+            height: size * 0.14,
+            borderBottomLeftRadius: size * 0.11,
+            borderBottomRightRadius: size * 0.11,
+            backgroundColor: color,
+            marginTop: size * 0.04,
           }}
         />
       </View>

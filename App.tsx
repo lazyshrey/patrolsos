@@ -14,6 +14,7 @@ import { Pressable, StatusBar, Text, View } from 'react-native';
 import { C, s } from './src/ui/theme';
 import { Glyph } from './src/ui/icons';
 import { useMesh } from './src/state/useMesh';
+import { BuzzAlert } from './src/ui/BuzzAlert';
 import { RequestScreen } from './src/ui/screens/RequestScreen';
 import { IncidentsScreen } from './src/ui/screens/IncidentsScreen';
 import { NetworkScreen } from './src/ui/screens/NetworkScreen';
@@ -42,6 +43,20 @@ export default function App() {
         {tab === 'network' && <NetworkScreen mesh={mesh} />}
         {tab === 'diagnostics' && <DiagnosticsScreen mesh={mesh} />}
       </View>
+
+      {/*
+        Rendered above the tabs and outside them: being rung is not a screen you
+        navigate to. It takes over whatever the person was doing, because a
+        rescuer is standing over them trying to find this phone.
+      */}
+      {mesh.buzzing && (
+        <BuzzAlert
+          buzz={mesh.buzzing}
+          endsAt={mesh.ringEndsAt}
+          fix={mesh.fix}
+          onSilence={mesh.silenceBuzz}
+        />
+      )}
 
       <View style={s.tabBar}>
         {TABS.map(([key, label, icon]) => {

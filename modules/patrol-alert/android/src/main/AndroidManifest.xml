@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <!--
+    Android 14 grants this only to apps whose notifications are genuinely
+    alarms or calls. A buzz is an alarm: somebody is standing in the rubble
+    above this phone trying to find it. If the grant is refused the alert
+    degrades to a heads-up notification, which is still audible.
+  -->
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+</manifest>

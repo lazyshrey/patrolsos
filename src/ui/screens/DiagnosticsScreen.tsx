@@ -88,6 +88,90 @@ export function DiagnosticsScreen({ mesh }: { mesh: MeshState }) {
         </Text>
       </View>
 
+      <View style={s.panel}>
+        <Text style={s.sectionLabel}>Running in the background</Text>
+        <Text style={s.quiet}>
+          Android freezes a backgrounded app within minutes: the radio stops, the timers stop,
+          and nothing tells you. A foreground service and a wake lock are the only way to keep
+          relaying with the screen off, and the price is the permanent notification.
+        </Text>
+
+        {!mesh.backgroundAvailable && (
+          <Text style={{ fontSize: 14, color: C.soon }}>
+            This build has no background service — PATROL only runs while it is on screen.
+          </Text>
+        )}
+
+        {mesh.backgroundAvailable && (
+          <>
+            {(
+              [
+                ['Service running', mesh.service.running, 'Start the mesh to raise it'],
+                [
+                  'Notification allowed',
+                  mesh.service.notificationsAllowed,
+                  'Without it Android may refuse to keep the service alive',
+                ],
+                [
+                  'Battery unrestricted',
+                  mesh.service.batteryUnrestricted,
+                  'Doze will suspend the radio overnight until you allow this',
+                ],
+              ] as Array<[string, boolean, string]>
+            ).map(([label, ok, hint]) => (
+              <View key={label} style={{ gap: 4 }}>
+                <View style={s.row}>
+                  <View style={[s.dot, { backgroundColor: ok ? C.wait : C.soon }]} />
+                  <Text style={[s.rowText, { flex: 1 }]}>{label}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: ok ? C.wait : C.soon }}>
+                    {ok ? 'ok' : 'no'}
+                  </Text>
+                </View>
+                {!ok && <Text style={[s.quiet, { paddingLeft: 23 }]}>{hint}</Text>}
+              </View>
+            ))}
+
+            {!mesh.service.batteryUnrestricted && (
+              <Pressable
+                onPress={() => void mesh.requestBatteryExemption()}
+                style={{
+                  height: 46,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: C.line,
+                  backgroundColor: C.card,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: C.action, fontSize: 15, fontWeight: '500' }}>
+                  Allow PATROL to run unrestricted
+                </Text>
+              </Pressable>
+            )}
+          </>
+        )}
+      </View>
+
+      <View style={s.panel}>
+        <Text style={s.sectionLabel}>Ringing</Text>
+        <Text style={s.quiet}>
+          A buzz makes a phone sound its alarm and answer with its position. Presses are named
+          by the caller's Lamport clock, so hearing the same one relayed a dozen times still
+          rings once.
+        </Text>
+        <Text style={s.code}>
+          buzzes heard {mesh.buzzes.length} · answers held {mesh.answers.length}
+        </Text>
+        {mesh.buzzes.slice(0, 6).map((b) => (
+          <Text key={`${b.callerNodeId}:${b.press}`} style={s.code}>
+            node {b.callerNodeId} → {b.targetNodeId === 255 ? 'all' : b.targetNodeId} · press{' '}
+            {b.press} · {b.seconds}s · hops {b.hops}
+            {b.forMe ? ' · rang us' : ''}
+          </Text>
+        ))}
+      </View>
+
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Stat label="heard" value={mesh.stats.heard} />
         <Stat label="relayed" value={mesh.stats.relayed} />

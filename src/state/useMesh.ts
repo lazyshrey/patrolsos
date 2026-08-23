@@ -26,7 +26,7 @@ import {
   saveOutbox,
 } from '../services/storage';
 import { clusterIncidents, type Cluster } from '../core/deduplicator';
-import type { LocationEstimate } from '../core/localization';
+import type { LocationEstimate, Observation } from '../core/localization';
 import { analyseBridge, bridgeMessage, type BridgeStatus } from '../core/topology';
 import type { OutboxEntry } from '../core/outbox';
 import {
@@ -88,6 +88,11 @@ export interface MeshState {
   clusters: Cluster[];
   peers: PeerState[];
   estimates: LocationEstimate[];
+  /**
+   * "X heard Y at this strength." The edges of the network graph, which is
+   * what lets the map draw links between two phones neither of which is us.
+   */
+  observations: Observation[];
   bridge: BridgeStatus;
   bridgeWarning: string | null;
   battery: number | null;
@@ -150,6 +155,7 @@ export function useMesh(): MeshState {
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [peers, setPeers] = useState<PeerState[]>([]);
   const [estimates, setEstimates] = useState<LocationEstimate[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
   const [bridge, setBridge] = useState<BridgeStatus>({
     isBridge: false,
     groups: [],
@@ -236,7 +242,9 @@ export function useMesh(): MeshState {
       setClusters(clusterIncidents(list));
       setPeers(peers);
       setEstimates(e.getLocationEstimates());
-      setBridge(analyseBridge(e.nodeId, peers, e.getObservations()));
+      const obs = e.getObservations();
+      setObservations(obs);
+      setBridge(analyseBridge(e.nodeId, peers, obs));
       setOutbox(e.outbox.all());
       setLog(e.getLog().slice(0, 50));
       setStats({ ...e.stats });
@@ -551,6 +559,7 @@ export function useMesh(): MeshState {
     clusters,
     peers,
     estimates,
+    observations,
     bridge,
     bridgeWarning: bridgeMessage(bridge),
     battery,

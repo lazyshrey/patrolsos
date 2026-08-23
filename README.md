@@ -147,7 +147,7 @@ Every packet is a compact **20-byte binary frame** (big-endian) that fits inside
 
 - **Request**: 3-tap panic reporting with S.T.A.R.T. triage and automatic satellite GPS tagging.
 - **Incidents**: Real-time triage feed with merged clusters and reverse status dispatching.
-- **Network**: Live mesh telemetry, peer hop distances, outbox delivery receipts, and the **Ring** controls for buzzing a peer or everyone in range.
+- **Network**: The **offline map** — every peer, estimated position and report drawn at true bearing and distance with the radio links between them, pan/pinch/tap, no tiles and no network — over live mesh telemetry, peer hop distances, outbox delivery receipts, and the **Ring** controls for buzzing a peer or everyone in range.
 - **Checks**: Preflight diagnostics for BLE advertising, scanning, permissions, location services and the background service.
 
 ---

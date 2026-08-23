@@ -2,6 +2,7 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { C, s } from '../theme';
 import { Glyph } from '../icons';
+import { MapPanel } from '../map/MapPanel';
 import { callsign } from '../../services/nodeIdentity';
 import { haversineMeters } from '../../core/geo';
 import { describeProximity } from '../../core/localization';
@@ -105,6 +106,11 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
           <Text style={s.quiet}>Android needs it for Bluetooth scanning, even with permission granted.</Text>
         </View>
       )}
+
+      <MapPanel
+        mesh={mesh}
+        onRing={(nodeId) => confirmRing(mesh, nodeId, callsign(nodeId))}
+      />
 
       <View style={[s.panel, { gap: 12 }]}>
         <View style={s.row}>

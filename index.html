@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>P.A.T.R.O.L. | Offline Peer-to-Peer Disaster Mesh Network</title>
-  <meta name="description" content="Peer-to-peer Aid, Tracking, & Remote Offline Link. Decentralized disaster coordination mesh for Android over connectionless BLE gossip. No cell, no Wi-Fi, no servers." />
+  <meta name="description" content="Peer-to-peer Aid, Tracking, & Remote Offline Link. Decentralized disaster coordination mesh for Android over connectionless BLE gossip. Zero cell, zero Wi-Fi, zero servers." />
   <meta name="author" content="Shrey Jaiswal" />
   <meta name="theme-color" content="#000000" />
 
   <!-- OpenGraph / Social -->
   <meta property="og:title" content="P.A.T.R.O.L. | Disaster Coordination Mesh" />
   <meta property="og:description" content="Zero-infrastructure disaster coordination for Android over connectionless BLE gossip." />
-  <meta property="og:url" content="https://github.com/lazyshrey/patrolsos" />
+  <meta property="og:url" content="https://patrolsos.lazyshrey.in" />
   <meta property="og:image" content="assets/logo.png" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -19,12 +19,12 @@
 
   <link rel="icon" type="image/png" href="assets/logo.png" />
 
-  <!-- Fonts & Icons -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -62,7 +62,7 @@
     .ambient-glow {
       position: absolute;
       border-radius: 9999px;
-      filter: blur(120px);
+      filter: blur(140px);
       pointer-events: none;
       opacity: 0.22;
       z-index: 0;
@@ -70,50 +70,50 @@
     .glow-top-left {
       top: -10%;
       left: -10%;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(208, 52, 44, 0.7) 0%, rgba(0, 130, 252, 0.3) 70%, transparent 100%);
+      width: 650px;
+      height: 650px;
+      background: radial-gradient(circle, rgba(208, 52, 44, 0.75) 0%, rgba(0, 130, 252, 0.3) 70%, transparent 100%);
     }
     .glow-bottom-right {
-      bottom: 10%;
+      bottom: 5%;
       right: -10%;
-      width: 700px;
-      height: 700px;
-      background: radial-gradient(circle, rgba(0, 130, 252, 0.6) 0%, rgba(208, 52, 44, 0.2) 70%, transparent 100%);
+      width: 750px;
+      height: 750px;
+      background: radial-gradient(circle, rgba(0, 130, 252, 0.65) 0%, rgba(208, 52, 44, 0.2) 70%, transparent 100%);
     }
     .glow-center {
-      top: 40%;
-      left: 30%;
-      width: 500px;
-      height: 500px;
+      top: 35%;
+      left: 25%;
+      width: 600px;
+      height: 600px;
       background: radial-gradient(circle, rgba(46, 125, 79, 0.3) 0%, transparent 70%);
     }
 
-    /* Glassmorphism Classes matching Chroma */
+    /* Glassmorphism Classes */
     .glass {
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(255, 255, 255, 0.035);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
     .glass-card {
       background: rgba(255, 255, 255, 0.025);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.06);
     }
     .glass-card:hover {
-      background: rgba(255, 255, 255, 0.045);
-      border-color: rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.16);
     }
 
-    /* Subtle Phone Frame */
+    /* Phone Mockup Frame */
     .phone-container {
       position: relative;
       border: 6px solid #1c1c1e;
-      border-radius: 42px;
+      border-radius: 40px;
       overflow: hidden;
-      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(255, 255, 255, 0.05);
+      box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(255, 255, 255, 0.06);
       background: #000;
     }
     .phone-container::before {
@@ -134,7 +134,20 @@
     }
     @keyframes pulse-dot {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+      50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    /* Toast Notification */
+    #toast {
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      transform: translate(-50%, 20px);
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+      transform: translate(-50%, 0);
     }
   </style>
 </head>
@@ -153,21 +166,28 @@
       <img src="assets/logo.png" alt="P.A.T.R.O.L. Logo" class="w-8 h-8 object-contain drop-shadow-lg group-hover:scale-105 transition-transform" />
       <div class="flex items-center gap-2">
         <span class="text-lg font-bold tracking-tight text-white drop-shadow-md">P.A.T.R.O.L.</span>
+        <span class="hidden sm:inline-block text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-gray-300 border border-white/10">v0.1.0</span>
       </div>
     </a>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <a href="#features" class="hidden md:inline-block text-gray-400 hover:text-white transition-colors text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/5">
+        Features
+      </a>
+      <a href="#how-it-works" class="hidden md:inline-block text-gray-400 hover:text-white transition-colors text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/5">
+        Protocol
+      </a>
       <a href="https://discord.com/invite/ZVCB8EnRX2" target="_blank" rel="noreferrer" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/5">
         <i data-lucide="message-circle" class="w-4 h-4"></i>
-        <span class="hidden md:inline">Discord</span>
+        <span class="hidden lg:inline">Discord</span>
       </a>
-
       <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/5">
         <i data-lucide="github" class="w-4 h-4"></i>
         <span class="hidden sm:inline">GitHub</span>
       </a>
 
-      <a href="patrol-latest.apk" download class="inline-flex items-center justify-center text-xs sm:text-sm font-semibold transition-all h-9 px-4 sm:px-5 bg-white text-black hover:bg-gray-200 rounded-full shadow-lg gap-2 hover:scale-[1.02] active:scale-[0.98]">
+      <!-- Direct APK Download from GitHub Releases -->
+      <a href="https://github.com/lazyshrey/patrolsos/releases/latest/download/patrol-latest.apk" target="_blank" rel="noreferrer" class="inline-flex items-center justify-center text-xs sm:text-sm font-semibold transition-all h-9 px-4 sm:px-5 bg-white text-black hover:bg-gray-200 rounded-full shadow-lg gap-2 hover:scale-[1.02] active:scale-[0.98]">
         <i data-lucide="download" class="w-3.5 h-3.5"></i>
         <span>Get APK</span>
       </a>
@@ -189,12 +209,13 @@
         </h1>
 
         <p class="text-base sm:text-lg text-gray-400 max-w-xl mb-8 font-normal leading-relaxed">
-          <strong class="text-gray-200">P.A.T.R.O.L.</strong> is an emergency coordination network for the first 72 hours of a disaster. Phones pass panic reports, casualty counts, and triage statuses hop-by-hop over connectionless Bluetooth Low Energy — <span class="text-white">zero cell towers, zero Wi-Fi, zero servers.</span>
+          <strong class="text-gray-200">P.A.T.R.O.L.</strong> is an autonomous emergency mesh network for the first 72 hours of a disaster. Phones pass panic signals, casualty counts, and triage updates hop-by-hop over raw Bluetooth LE — <span class="text-white">zero cell towers, zero Wi-Fi, zero servers.</span>
         </p>
 
         <!-- CTA Buttons Row -->
         <div class="flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto">
-          <a href="patrol-latest.apk" download class="w-full sm:w-auto">
+          <!-- Primary: Direct GitHub Release Download -->
+          <a href="https://github.com/lazyshrey/patrolsos/releases/latest/download/patrol-latest.apk" target="_blank" rel="noreferrer" class="w-full sm:w-auto">
             <button class="w-full sm:w-auto inline-flex items-center justify-center px-7 py-4 text-[15px] font-bold tracking-wide bg-white text-black hover:bg-gray-200 rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.15)] transition-all gap-2.5 hover:scale-[1.02] active:scale-[0.98]">
               <i data-lucide="download" class="w-5 h-5 text-black"></i>
               <span>Download APK for Android</span>
@@ -202,16 +223,17 @@
             </button>
           </a>
 
-          <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="w-full sm:w-auto">
+          <!-- Secondary: View All GitHub Releases -->
+          <a href="https://github.com/lazyshrey/patrolsos/releases" target="_blank" rel="noreferrer" class="w-full sm:w-auto">
             <button class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-4 text-[15px] font-medium tracking-wide border border-white/20 text-white hover:bg-white/10 rounded-2xl transition-all gap-2 hover:scale-[1.02] active:scale-[0.98]">
-              <i data-lucide="github" class="w-4 h-4 text-gray-300"></i>
-              <span>View on GitHub</span>
+              <i data-lucide="tag" class="w-4 h-4 text-gray-300"></i>
+              <span>All Releases</span>
             </button>
           </a>
         </div>
 
         <!-- Micro Feature Guarantee -->
-        <div class="flex items-center gap-6 mt-8 text-xs text-gray-500 font-mono">
+        <div class="flex flex-wrap justify-center lg:justify-start items-center gap-5 sm:gap-6 mt-8 text-xs text-gray-500 font-mono">
           <div class="flex items-center gap-1.5">
             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
             <span>MIT Licensed</span>
@@ -222,7 +244,7 @@
           </div>
           <div class="flex items-center gap-1.5">
             <i data-lucide="cpu" class="w-4 h-4 text-amber-400"></i>
-            <span>CRDT Convergent</span>
+            <span>CRDT Lattice</span>
           </div>
         </div>
 
@@ -233,7 +255,7 @@
         <div class="w-full max-w-[280px] sm:max-w-[320px] relative group">
           
           <!-- Ambient Card Backlight -->
-          <div class="absolute -inset-4 bg-gradient-to-tr from-red-500/20 via-blue-500/20 to-emerald-500/10 blur-2xl opacity-60 rounded-full pointer-events-none group-hover:opacity-90 transition-opacity duration-700"></div>
+          <div class="absolute -inset-4 bg-gradient-to-tr from-red-500/25 via-blue-500/20 to-emerald-500/15 blur-2xl opacity-65 rounded-full pointer-events-none group-hover:opacity-95 transition-opacity duration-700"></div>
 
           <!-- Phone Mockup Frame with Real Screenshot -->
           <div class="phone-container relative z-10 transition-transform duration-500 group-hover:-translate-y-2">
@@ -267,6 +289,59 @@
           <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
             <i data-lucide="database" class="w-4 h-4 text-amber-400"></i> SQLite
           </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- App Walkthrough Interactive Tabs -->
+    <section class="glass p-7 sm:p-9 rounded-3xl relative z-10 border border-white/10">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <p class="text-xs font-mono uppercase tracking-wider text-emerald-400 mb-1">Disaster-Tested UI</p>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Four Focused Screens</h2>
+        </div>
+        <span class="text-xs font-mono text-gray-500">Zero non-essential elements</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-red-500/40 transition-all">
+          <div class="flex items-center gap-2 mb-3 text-red-400">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <h4 class="font-bold text-white text-base">1. Request</h4>
+          </div>
+          <p class="text-gray-400 text-xs leading-relaxed">
+            3-tap panic composer. S.T.A.R.T. triage selection, casualty counter, and automatic satellite GPS tagging.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-amber-500/40 transition-all">
+          <div class="flex items-center gap-2 mb-3 text-amber-400">
+            <i data-lucide="list-checks" class="w-5 h-5"></i>
+            <h4 class="font-bold text-white text-base">2. Incidents</h4>
+          </div>
+          <p class="text-gray-400 text-xs leading-relaxed">
+            Live triage feed. Geo-deduplicated clusters, status lifecycle management, and reverse status dispatching.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-blue-500/40 transition-all">
+          <div class="flex items-center gap-2 mb-3 text-blue-400">
+            <i data-lucide="activity" class="w-5 h-5"></i>
+            <h4 class="font-bold text-white text-base">3. Network</h4>
+          </div>
+          <p class="text-gray-400 text-xs leading-relaxed">
+            Mesh topology inspector, direct/relayed peer list, signal dBm indicators, and outbox echo receipts.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-emerald-500/40 transition-all">
+          <div class="flex items-center gap-2 mb-3 text-emerald-400">
+            <i data-lucide="wrench" class="w-5 h-5"></i>
+            <h4 class="font-bold text-white text-base">4. Checks</h4>
+          </div>
+          <p class="text-gray-400 text-xs leading-relaxed">
+            Four preflight status lights: BLE advertise support, scanner state, location services, and database integrity.
+          </p>
         </div>
       </div>
     </section>
@@ -335,7 +410,7 @@
           </div>
           <h3 class="text-lg font-bold text-white tracking-tight mb-2">Monotonic Lattice CRDT</h3>
           <p class="text-gray-400 text-sm leading-relaxed">
-            Conflict-free state merges via mathematical supremum: <span class="font-mono text-xs text-gray-300">Reported < Ack < InProgress < Resolved</span>. Resolved incidents never regress.
+            Conflict-free state merges via mathematical supremum: <span class="font-mono text-xs text-gray-300">Reported &lt; Ack &lt; InProgress &lt; Resolved</span>. Resolved incidents never regress.
           </p>
         </div>
         <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
@@ -367,7 +442,7 @@
           </div>
           <h3 class="text-lg font-bold text-white tracking-tight mb-2">Echo Delivery Receipts</h3>
           <p class="text-gray-400 text-sm leading-relaxed">
-            When peers relay your broadcast, they increment the hop counter. Hearing your own node ID on the radio with <span class="font-mono text-xs text-gray-300">hops > 0</span> gives proof of pickup with zero overhead.
+            When peers relay your broadcast, they increment the hop counter. Hearing your own node ID on the radio with <span class="font-mono text-xs text-gray-300">hops &gt; 0</span> gives proof of pickup with zero overhead.
           </p>
         </div>
         <div class="mt-5 pt-4 border-t border-white/5 text-xs text-gray-500 font-mono">
@@ -378,14 +453,14 @@
     </section>
 
     <!-- Wire Frame Technical Spec Section -->
-    <section class="glass p-7 sm:p-9 rounded-3xl relative z-10 border border-white/10">
+    <section id="how-it-works" class="glass p-7 sm:p-9 rounded-3xl relative z-10 border border-white/10">
       <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
         <div>
           <div class="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-blue-400 mb-2">
             <i data-lucide="binary" class="w-4 h-4"></i>
             <span>Compact Wire Protocol</span>
           </div>
-          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">The 20-Byte Binary Frame</h2>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">The 20-Byte Binary Frame (`PATROL/1`)</h2>
         </div>
         <p class="text-gray-400 text-sm max-w-md">
           Fits cleanly inside legacy 31-byte BLE advertising packets without fragmentation or MTU negotiation delays.
@@ -393,52 +468,52 @@
       </div>
 
       <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-center font-mono text-xs">
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-blue-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 0 (4B)</div>
           <div class="font-semibold text-blue-400 mt-1">packetId</div>
           <div class="text-gray-500 text-[10px]">SHA-256 slice</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 4 (4B)</div>
           <div class="font-semibold text-cyan-400 mt-1">lat (i32)</div>
           <div class="text-gray-500 text-[10px]">10⁻⁶ deg (~11cm)</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 8 (4B)</div>
           <div class="font-semibold text-cyan-400 mt-1">lon (i32)</div>
           <div class="text-gray-500 text-[10px]">10⁻⁶ deg (~11cm)</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 12 (1B)</div>
           <div class="font-semibold text-emerald-400 mt-1">cat : triage</div>
           <div class="text-gray-500 text-[10px]">Two nibbles</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-amber-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 13 (1B)</div>
           <div class="font-semibold text-amber-400 mt-1">casualties</div>
           <div class="text-gray-500 text-[10px]">u8 (255=many)</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-purple-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 14 (1B)</div>
           <div class="font-semibold text-purple-400 mt-1">ttl : hops</div>
           <div class="text-gray-500 text-[10px]">TTL 7 • Max 15</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-indigo-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 15 (2B)</div>
           <div class="font-semibold text-indigo-400 mt-1">lamport</div>
           <div class="text-gray-500 text-[10px]">u16 logical clock</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-red-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 17 (1B)</div>
           <div class="font-semibold text-red-400 mt-1">status</div>
           <div class="text-gray-500 text-[10px]">CRDT lattice</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-yellow-400/50 transition-colors">
           <div class="text-gray-500 text-[10px] uppercase">Off 18 (1B)</div>
           <div class="font-semibold text-yellow-400 mt-1">descPreset</div>
           <div class="text-gray-500 text-[10px]">Canned phrases</div>
         </div>
-        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 col-span-2 sm:col-span-4 lg:col-span-1">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-400/50 transition-colors col-span-2 sm:col-span-4 lg:col-span-1">
           <div class="text-gray-500 text-[10px] uppercase">Off 19 (1B)</div>
           <div class="font-semibold text-emerald-400 mt-1">originNodeId</div>
           <div class="text-gray-500 text-[10px]">LWW tiebreaker</div>
@@ -446,39 +521,57 @@
       </div>
     </section>
 
+    <!-- ADB Install Command Box -->
+    <section class="glass p-6 sm:p-8 rounded-3xl relative z-10 border border-white/10 max-w-4xl mx-auto w-full">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="terminal" class="w-5 h-5 text-emerald-400"></i>
+          <span class="font-semibold text-white text-sm">Quick ADB Sideload Command</span>
+        </div>
+        <span class="text-xs text-gray-500 font-mono">Run in terminal</span>
+      </div>
+
+      <div class="flex items-center justify-between bg-black/60 border border-white/10 rounded-xl p-3.5 sm:px-5 font-mono text-xs sm:text-sm text-gray-300">
+        <code id="adb-code" class="text-emerald-400 select-all overflow-x-auto whitespace-nowrap mr-3">adb install -r patrol-latest.apk</code>
+        <button onclick="copyCode('adb-code')" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors flex items-center gap-1 shrink-0 text-xs font-sans">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>Copy</span>
+        </button>
+      </div>
+    </section>
+
     <!-- Open Source, Community & Download Section (Chroma Style) -->
-    <section class="relative z-10 py-12 px-6 sm:px-10 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-sm">
+    <section id="download" class="relative z-10 py-12 px-6 sm:px-10 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-sm">
       <div class="max-w-4xl mx-auto flex flex-col items-center gap-8">
         
         <div class="text-center">
           <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Open Source Disaster Infrastructure</p>
-          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Join the Decentralized Mission</h2>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Download &amp; Join the Mission</h2>
         </div>
 
         <div class="flex flex-wrap justify-center items-center gap-3.5">
-          <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
+          <!-- Primary Download Button -->
+          <a href="https://github.com/lazyshrey/patrolsos/releases/latest/download/patrol-latest.apk" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-black hover:bg-gray-200 transition-all text-sm font-bold shadow-lg hover:scale-105">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Download APK (v0.1.0)</span>
+          </a>
+
+          <!-- GitHub Star -->
+          <a href="https://github.com/lazyshrey/patrolsos" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
             <i data-lucide="star" class="w-4 h-4 text-yellow-400"></i>
             <span class="font-semibold">Star on GitHub</span>
           </a>
 
-          <a href="https://github.com/lazyshrey/patrolsos/fork" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
+          <!-- GitHub Fork -->
+          <a href="https://github.com/lazyshrey/patrolsos/fork" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
             <i data-lucide="git-fork" class="w-4 h-4"></i>
             <span class="font-semibold">Fork</span>
           </a>
 
-          <a href="https://github.com/lazyshrey/patrolsos/issues" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm text-gray-300 hover:text-white">
-            <i data-lucide="alert-circle" class="w-4 h-4"></i>
-            <span class="font-semibold">Issues</span>
-          </a>
-
-          <a href="https://discord.com/invite/ZVCB8EnRX2" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-[#5865F2]/20 hover:bg-[#5865F2]/30 border-[#5865F2]/40 transition-all text-sm text-white">
+          <!-- Discord -->
+          <a href="https://discord.com/invite/ZVCB8EnRX2" target="_blank" rel="noreferrer" class="flex items-center gap-2 px-5 py-3 rounded-2xl border border-white/10 bg-[#5865F2]/20 hover:bg-[#5865F2]/30 border-[#5865F2]/40 transition-all text-sm text-white">
             <i data-lucide="message-circle" class="w-4 h-4 text-[#5865F2]"></i>
             <span class="font-semibold">Join Discord</span>
-          </a>
-
-          <a href="patrol-latest.apk" download class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white text-black hover:bg-gray-200 transition-all text-sm font-semibold">
-            <i data-lucide="download" class="w-4 h-4"></i>
-            <span>patrol-v0.1.0.apk</span>
           </a>
         </div>
 
@@ -491,7 +584,10 @@
               <span>Buy Me a Coffee • Support via UPI</span>
             </button>
           </a>
-          <span class="text-xs text-gray-500 font-mono select-all">5aprilshrey@oksbi</span>
+          <button onclick="copyUpi('5aprilshrey@oksbi')" class="text-xs text-gray-500 font-mono hover:text-gray-300 transition-colors flex items-center gap-1.5 cursor-pointer bg-white/5 px-3 py-1 rounded-full border border-white/5">
+            <span id="upi-text">5aprilshrey@oksbi</span>
+            <i data-lucide="copy" class="w-3 h-3"></i>
+          </button>
         </div>
 
       </div>
@@ -517,6 +613,9 @@
         <a target="_blank" class="hover:text-white transition-colors flex items-center gap-1.5" href="https://github.com/lazyshrey/patrolsos">
           <i data-lucide="github" class="w-4 h-4"></i> Source Code
         </a>
+        <a target="_blank" class="hover:text-white transition-colors flex items-center gap-1.5" href="https://github.com/lazyshrey/patrolsos/releases">
+          <i data-lucide="tag" class="w-4 h-4"></i> Releases
+        </a>
         <a class="hover:text-white transition-colors" href="LICENSE">
           MIT License
         </a>
@@ -525,9 +624,39 @@
     </div>
   </footer>
 
-  <!-- Initialize Lucide Icons -->
+  <!-- Toast Element -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass px-4 py-2.5 rounded-2xl shadow-2xl border border-white/20 text-xs font-mono text-white flex items-center gap-2">
+    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-message">Copied to clipboard!</span>
+  </div>
+
+  <!-- Scripts -->
   <script>
+    // Initialize Lucide Icons
     lucide.createIcons();
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    function copyCode(elementId) {
+      const code = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('Command copied to clipboard!');
+      });
+    }
+
+    function copyUpi(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('UPI ID copied to clipboard!');
+      });
+    }
   </script>
 
 </body>

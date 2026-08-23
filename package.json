@@ -11,6 +11,7 @@
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.2",
+    "react-native-svg": "15.15.4",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

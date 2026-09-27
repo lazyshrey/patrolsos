@@ -7,6 +7,7 @@ import { callsign } from '../../services/nodeIdentity';
 import { haversineMeters } from '../../core/geo';
 import { describeProximity } from '../../core/localization';
 import { BUZZ_ALL, DEFAULT_RING_SECONDS } from '../../core/buzz';
+import { summarizeNetworkHealth } from '../../core/networkHealth';
 import type { MeshState } from '../../state/useMesh';
 
 function ago(ms: number): string {
@@ -45,6 +46,7 @@ function confirmRing(mesh: MeshState, targetNodeId: number, label: string) {
 export function NetworkScreen({ mesh }: { mesh: MeshState }) {
   const direct = mesh.peers.filter((p) => p.hops === 0).length;
   const relayed = mesh.peers.length - direct;
+  const networkHealth = summarizeNetworkHealth(mesh.peers);
 
   const locationOff = mesh.bleStatus && !mesh.bleStatus.locationEnabled;
 
@@ -72,6 +74,23 @@ export function NetworkScreen({ mesh }: { mesh: MeshState }) {
         <Text style={[s.meta, { paddingLeft: 24 }]}>
           {mesh.peers.length} phone{mesh.peers.length === 1 ? '' : 's'} nearby ·{' '}
           {mesh.incidents.length} report{mesh.incidents.length === 1 ? '' : 's'} shared
+        </Text>
+      </View>
+
+      <View style={s.panel}>
+        <Text style={s.sectionLabel}>Network health</Text>
+        <Text style={s.rowText}>
+          {networkHealth.health === 'connected'
+            ? 'Direct connection available'
+            : networkHealth.health === 'relay'
+              ? 'Reachable through a relay'
+              : 'No peers currently reachable'}
+        </Text>
+        <Text style={s.quiet}>
+          {networkHealth.directPeers} direct · {networkHealth.relayedPeers} relayed
+          {networkHealth.lowBatteryPeers > 0
+            ? ` · ${networkHealth.lowBatteryPeers} low-battery peer${networkHealth.lowBatteryPeers === 1 ? '' : 's'}`
+            : ''}
         </Text>
       </View>
 
